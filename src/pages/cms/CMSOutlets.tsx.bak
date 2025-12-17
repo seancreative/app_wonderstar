@@ -1,0 +1,511 @@
+import React, { useState, useEffect } from 'react';
+import CMSLayout from '../../components/cms/CMSLayout';
+import {
+  Store,
+  Plus,
+  Edit2,
+  MapPin,
+  Phone,
+  Mail,
+  Clock,
+  Users,
+  Check,
+  X,
+  AlertCircle,
+  Search,
+  Calendar,
+  Trash2
+} from 'lucide-react';
+import { supabase } from '../../lib/supabase';
+import { Outlet, OutletFacility } from '../../types/database';
+
+interface OutletWithFacilities extends Outlet {
+  outlet_facilities?: OutletFacility[];
+}
+
+const CMSOutlets: React.FC = () => {
+  const [outlets, setOutlets] = useState<OutletWithFacilities[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showModal, setShowModal] = useState(false);
+  const [editingOutlet, setEditingOutlet] = useState<OutletWithFacilities | null>(null);
+  const [formData, setFormData] = useState({
+    name: '',
+    location: '',
+    address: '',
+    contact_phone: '',
+    contact_email: '',
+    capacity: '',
+    status: 'active' as 'active' | 'inactive'
+  });
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  useEffect(() => {
+    loadOutlets();
+  }, []);
+
+  const loadOutlets = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('outlets')
+        .select('*, outlet_facilities(*)')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setOutlets(data || []);
+    } catch (err) {
+      console.error('Error loading outlets:', err);
+      setError('Failed to load outlets');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredOutlets = outlets.filter(outlet =>
+    searchTerm === '' ||
+    outlet.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    outlet.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    outlet.address.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+
+    if (!formData.name || !formData.location || !formData.address) {
+      setError('Please fill in all required fields');
+      return;
+    }
+
+    try {
+      const outletData = {
+        name: formData.name,
+        location: formData.location,
+        address: formData.address,
+        contact_phone: formData.contact_phone || null,
+        contact_email: formData.contact_email || null,
+        capacity: formData.capacity ? parseInt(formData.capacity) : null,
+        status: formData.status,
+        slug: formData.name.toLowerCase().replace(/\s+/g, '-'),
+        updated_at: new Date().toISOString()
+      };
+
+      if (editingOutlet) {
+        const { error: updateError } = await supabase
+          .from('outlets')
+          .update(outletData)
+          .eq('id', editingOutlet.id);
+
+        if (updateError) throw updateError;
+        setSuccess('Outlet updated successfully');
+      } else {
+        const { error: insertError } = await supabase
+          .from('outlets')
+          .insert(outletData);
+
+        if (insertError) throw insertError;
+        setSuccess('Outlet created successfully');
+      }
+
+      await loadOutlets();
+      closeModal();
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      console.error('Error saving outlet:', err);
+      setError('Failed to save outlet');
+    }
+  };
+
+  const deleteOutlet = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this outlet? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('outlets')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      await loadOutlets();
+      setSuccess('Outlet deleted successfully');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      console.error('Error deleting outlet:', err);
+      setError('Failed to delete outlet');
+    }
+  };
+
+  const toggleOutletStatus = async (outlet: OutletWithFacilities) => {
+    try {
+      const newStatus = outlet.status === 'active' ? 'inactive' : 'active';
+      console.log(`Toggling outlet ${outlet.id} (${outlet.name}) from ${outlet.status} to ${newStatus}`);
+      
+      const { error } = await supabase
+        .from('outlets')
+        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .eq('id', outlet.id);
+
+      if (error) {
+        console.error(`Error updating outlet ${outlet.id}:`, error);
+        throw error;
+      }
+      
+      await loadOutlets();
+      setSuccess(`Outlet "${outlet.name}" (ID: ${outlet.id.slice(0, 8)}) ${newStatus === 'active' ? 'activated' : 'deactivated'} successfully`);
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err: any) {
+      console.error('Error toggling outlet status:', err);
+      setError(`Failed to update outlet "${outlet.name}" (ID: ${outlet.id.slice(0, 8)}): ${err.message || 'Unknown error'}`);
+      setTimeout(() => setError(''), 5000);
+    }
+  };
+
+  const openEditModal = (outlet: OutletWithFacilities) => {
+    setEditingOutlet(outlet);
+    setFormData({
+      name: outlet.name,
+      location: outlet.location,
+      address: outlet.address,
+      contact_phone: outlet.contact_phone || '',
+      contact_email: outlet.contact_email || '',
+      capacity: outlet.capacity?.toString() || '',
+      status: outlet.status
+    });
+    setShowModal(true);
+  };
+
+  const closeModal = () => {
+    setShowModal(false);
+    setEditingOutlet(null);
+    setFormData({
+      name: '',
+      location: '',
+      address: '',
+      contact_phone: '',
+      contact_email: '',
+      capacity: '',
+      status: 'active'
+    });
+    setError('');
+  };
+
+  const stats = {
+    total: filteredOutlets.length,
+    active: filteredOutlets.filter(o => o.status === 'active').length,
+    inactive: filteredOutlets.filter(o => o.status === 'inactive').length
+  };
+
+  if (loading) {
+    return (
+      <CMSLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+      </CMSLayout>
+    );
+  }
+
+  return (
+    <CMSLayout>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-black text-gray-900 mb-2">Outlets Management</h1>
+            <p className="text-gray-600 font-medium">Manage outlet locations and settings</p>
+          </div>
+          <button
+            onClick={() => setShowModal(true)}
+            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl font-bold hover:scale-105 transition-transform shadow-lg"
+          >
+            <Plus className="w-5 h-5" />
+            Add Outlet
+          </button>
+        </div>
+
+        {success && (
+          <div className="flex items-center gap-3 p-4 bg-green-50 border-2 border-green-200 rounded-xl">
+            <Check className="w-5 h-5 text-green-600 flex-shrink-0" />
+            <p className="text-sm text-green-800 font-semibold">{success}</p>
+          </div>
+        )}
+
+        {error && (
+          <div className="flex items-center gap-3 p-4 bg-red-50 border-2 border-red-200 rounded-xl">
+            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
+            <p className="text-sm text-red-800 font-semibold">{error}</p>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-white rounded-xl border-2 border-gray-200 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-bold text-gray-600 mb-1">Total Outlets</p>
+                <p className="text-3xl font-black text-gray-900">{stats.total}</p>
+              </div>
+              <Store className="w-12 h-12 text-gray-300" />
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl border-2 border-green-200 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-bold text-green-700 mb-1">Active</p>
+                <p className="text-3xl font-black text-green-900">{stats.active}</p>
+              </div>
+              <Check className="w-12 h-12 text-green-500" />
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border-2 border-gray-200 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-bold text-gray-700 mb-1">Inactive</p>
+                <p className="text-3xl font-black text-gray-900">{stats.inactive}</p>
+              </div>
+              <X className="w-12 h-12 text-gray-500" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-gray-200 p-6">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search outlets..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:outline-none font-medium"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredOutlets.length === 0 ? (
+            <div className="col-span-full bg-white rounded-2xl border border-gray-200 p-12 text-center">
+              <Store className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-600 font-medium">No outlets found</p>
+            </div>
+          ) : (
+            filteredOutlets.map((outlet) => (
+              <div key={outlet.id} className="bg-white rounded-2xl border-2 border-gray-200 p-6 hover:shadow-lg transition-shadow">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex-1">
+                    <h3 className="text-xl font-black text-gray-900 mb-1">{outlet.name}</h3>
+                    <p className="text-sm font-bold text-gray-600">{outlet.location}</p>
+                    <p className="text-xs text-gray-400 mt-1 font-mono">ID: {outlet.id.slice(0, 8)}</p>
+                  </div>
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${
+                    outlet.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+                  }`}>
+                    {outlet.status === 'active' ? 'Active' : 'Inactive'}
+                  </span>
+                </div>
+
+                <div className="space-y-3 mb-4">
+                  <div className="flex items-start gap-3">
+                    <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
+                    <p className="text-sm text-gray-700 font-medium">{outlet.address}</p>
+                  </div>
+
+                  {outlet.contact_phone && (
+                    <div className="flex items-center gap-3">
+                      <Phone className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                      <p className="text-sm text-gray-700 font-medium">{outlet.contact_phone}</p>
+                    </div>
+                  )}
+
+                  {outlet.contact_email && (
+                    <div className="flex items-center gap-3">
+                      <Mail className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                      <p className="text-sm text-gray-700 font-medium">{outlet.contact_email}</p>
+                    </div>
+                  )}
+
+                  {outlet.capacity && (
+                    <div className="flex items-center gap-3">
+                      <Users className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                      <p className="text-sm text-gray-700 font-medium">Capacity: {outlet.capacity}</p>
+                    </div>
+                  )}
+
+                  {outlet.outlet_facilities && outlet.outlet_facilities.length > 0 && (
+                    <div className="pt-2 border-t border-gray-200">
+                      <p className="text-xs font-bold text-gray-600 mb-2">Facilities:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {outlet.outlet_facilities.map((facility) => (
+                          <span
+                            key={facility.id}
+                            className="inline-flex items-center px-2 py-1 bg-blue-50 text-blue-700 rounded-lg text-xs font-bold"
+                          >
+                            {facility.name}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 pt-4 border-t border-gray-200">
+                  <button
+                    onClick={() => openEditModal(outlet)}
+                    className="flex-1 flex items-center justify-center gap-2 py-2 bg-blue-50 text-blue-600 rounded-lg font-bold hover:bg-blue-100 transition-colors"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => toggleOutletStatus(outlet)}
+                    className={`flex-1 py-2 rounded-lg font-bold transition-colors ${
+                      outlet.status === 'active'
+                        ? 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        : 'bg-green-50 text-green-600 hover:bg-green-100'
+                    }`}
+                  >
+                    {outlet.status === 'active' ? 'Deactivate' : 'Activate'}
+                  </button>
+                  <button
+                    onClick={() => deleteOutlet(outlet.id)}
+                    className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/70 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-8 max-w-2xl w-full shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-black text-gray-900">
+                {editingOutlet ? 'Edit Outlet' : 'Add New Outlet'}
+              </h2>
+              <button onClick={closeModal} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                <X className="w-6 h-6 text-gray-600" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Outlet Name *</label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:outline-none font-medium"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Location *</label>
+                <input
+                  type="text"
+                  value={formData.location}
+                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:outline-none font-medium"
+                  required
+                  placeholder="e.g., Kuala Lumpur, Selangor"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Address *</label>
+                <textarea
+                  value={formData.address}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:outline-none font-medium resize-none"
+                  rows={3}
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Contact Phone</label>
+                  <input
+                    type="tel"
+                    value={formData.contact_phone}
+                    onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })}
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:outline-none font-medium"
+                    placeholder="+60123456789"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Contact Email</label>
+                  <input
+                    type="email"
+                    value={formData.contact_email}
+                    onChange={(e) => setFormData({ ...formData, contact_email: e.target.value })}
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:outline-none font-medium"
+                    placeholder="outlet@wonderstars.com"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Capacity</label>
+                  <input
+                    type="number"
+                    value={formData.capacity}
+                    onChange={(e) => setFormData({ ...formData, capacity: e.target.value })}
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:outline-none font-medium"
+                    placeholder="50"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">Status</label>
+                  <select
+                    value={formData.status}
+                    onChange={(e) => setFormData({ ...formData, status: e.target.value as 'active' | 'inactive' })}
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:outline-none font-medium"
+                  >
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </div>
+              </div>
+
+              {error && (
+                <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl">
+                  <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
+                  <p className="text-sm text-red-800 font-semibold">{error}</p>
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={closeModal}
+                  className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-xl font-bold hover:bg-gray-300 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl font-bold hover:scale-105 transition-transform shadow-lg"
+                >
+                  {editingOutlet ? 'Update Outlet' : 'Create Outlet'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </CMSLayout>
+  );
+};
+
+export default CMSOutlets;

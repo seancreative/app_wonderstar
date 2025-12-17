@@ -1,0 +1,404 @@
+@import url('https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: 'M PLUS Rounded 1c', 'Trebuchet MS', 'Lucida Sans Unicode', 'Lucida Grande', 'Lucida Sans', Arial, sans-serif;
+}
+
+.dim {
+  transition: 0.5s linear;
+}
+
+.dim[data-animate] {
+  filter: brightness(0.7) saturate(1.2);
+  transition: 0.3s steps(4);
+}
+
+.confetti {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+  z-index: 10;
+  pointer-events: none;
+  perspective: 100vmin;
+}
+
+.confetti span {
+  --size: 5;
+  display: block;
+  position: absolute;
+  width: calc(var(--size) * 1px);
+  height: calc(var(--size) * 1px);
+  background-color: blue;
+  animation: rotate linear calc(var(--rs) * 1s) infinite both;
+}
+
+#app.gotcha {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+#app.gotcha .container {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+#app.gotcha .game-layer {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  background: url(https://assets.codepen.io/2509128/bg.jpg) center/auto 100% no-repeat;
+}
+
+#app.gotcha .machine-container {
+  position: relative;
+  white-space: nowrap;
+}
+
+#app.gotcha .machine {
+  position: relative;
+  z-index: 1;
+  max-height: 80vh;
+  pointer-events: none;
+}
+
+#app.gotcha .backboard {
+  z-index: 0;
+  width: 15vh;
+  height: 13vh;
+  top: 65%;
+  left: 48%;
+  background-color: #e288bb;
+  position: absolute;
+}
+
+#app.gotcha .title {
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  position: absolute;
+  display: block;
+  top: 10%;
+  width: 100%;
+  text-align: center;
+  font-size: 4.5vh;
+  z-index: 3;
+  color: #FFFF00;
+  text-transform: uppercase;
+  letter-spacing: 0.3vh;
+  text-shadow:
+    -4px -4px 0 #000,
+    4px -4px 0 #000,
+    -4px 4px 0 #000,
+    4px 4px 0 #000,
+    0 0 15px #FF1493,
+    0 0 30px #FF69B4;
+  filter: drop-shadow(8px 8px 0px rgba(0, 0, 0, 0.6));
+  image-rendering: pixelated;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#app.gotcha .title span {
+  animation: pixel-blink 1s steps(2) infinite both;
+  display: inline-block;
+}
+
+#app.gotcha .title span:nth-child(1) { animation-delay: 0.12s; }
+#app.gotcha .title span:nth-child(2) { animation-delay: 0.24s; }
+#app.gotcha .title span:nth-child(3) { animation-delay: 0.36s; }
+#app.gotcha .title span:nth-child(4) { animation-delay: 0.48s; }
+#app.gotcha .title span:nth-child(5) { animation-delay: 0.60s; }
+#app.gotcha .title span:nth-child(6) { animation-delay: 0.72s; }
+#app.gotcha .title span:nth-child(7) { animation-delay: 0.84s; }
+#app.gotcha .title span:nth-child(8) { animation-delay: 0.96s; }
+#app.gotcha .title span:nth-child(9) { animation-delay: 1.08s; }
+#app.gotcha .title span:nth-child(10) { animation-delay: 1.20s; }
+
+#app.gotcha .price {
+  z-index: 3;
+  position: absolute;
+  color: #fb91c9;
+  font-size: 2.5vh;
+  top: 80%;
+  left: 15%;
+}
+
+#app.gotcha .handle {
+  z-index: 3;
+  position: absolute;
+  height: 3.9vh;
+  left: 13%;
+  top: 69%;
+}
+
+#app.gotcha .balls {
+  position: absolute;
+  top: 22%;
+  left: 2%;
+  width: 96%;
+  height: 34.5%;
+}
+
+#app.gotcha .pointer {
+  position: absolute;
+  height: 15vh;
+  top: 75%;
+  left: 15%;
+  z-index: 5;
+  pointer-events: none;
+}
+
+#app.gotcha .pointer img {
+  height: 100%;
+  display: block;
+  transform: rotate(-30deg);
+  transform-origin: 0% 0%;
+  animation: click 1s ease-in-out infinite both;
+}
+
+#app.gotcha .ui-layer {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+#app.gotcha .title-container {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 10;
+}
+
+#app.gotcha .title-container .title h2 {
+  text-align: center;
+  text-shadow: 0px 0px 2px #f06e5b, 0px 0px 2px #f06e5b, 0px 0px 2px #f06e5b, 0px 0px 2px #f06e5b,
+    0px 0px 2px #f06e5b, 0px 0px 2px #f06e5b, 0px 0px 2px #f06e5b, 0px 0px 2px #f06e5b,
+    0px 0px 2px #f06e5b, 0px 0px 2px #f06e5b, 0px 0px 2px #f06e5b, 0px 0px 2px #f06e5b;
+  filter: drop-shadow(0px 2px 0px rgba(0, 0, 0, 0.2));
+  font-size: 5vh;
+  color: white;
+}
+
+#app.gotcha .prize-container {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+#app.gotcha .prize-ball-container {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+#app.gotcha .prize-reward-container {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 100;
+}
+
+#app.gotcha .prize-reward-container > * {
+  display: block;
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#app.gotcha .prize img {
+  height: 50vh;
+}
+
+#app.gotcha .shine img {
+  height: 100vh;
+  animation: spin linear 5s infinite forwards;
+}
+
+#app.gotcha .ball {
+  --size: 8vh;
+  --outline: #4c3fc2;
+  --color1: #2facff;
+  --color2: #ff8ff6;
+  width: var(--size);
+  height: var(--size);
+  border-radius: 100%;
+  background-color: var(--color1);
+  border: solid 0.8vh var(--outline);
+  position: absolute;
+  overflow: hidden;
+}
+
+#app.gotcha .ball::after {
+  content: '';
+  display: block;
+  position: absolute;
+  top: 50%;
+  height: 200%;
+  width: 200%;
+  background-color: var(--color2);
+  border-radius: 100%;
+  border: inherit;
+  transform: translate(-25%, -5%);
+}
+
+#app.gotcha .wiggle {
+  animation: wiggle 2s ease-in-out infinite both;
+}
+
+@keyframes blink {
+  0% {
+    color: #ffc7e5;
+  }
+  20% {
+    color: #fcff33;
+  }
+  100% {
+    color: #ffc7e5;
+  }
+}
+
+@keyframes pixel-blink {
+  0%, 49% {
+    color: #FFFF00;
+  }
+  50%, 100% {
+    color: #FF1493;
+  }
+}
+
+@keyframes pixel-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes wiggle {
+  0% {
+    transform: rotate(-5deg);
+  }
+  50% {
+    transform: rotate(5deg);
+  }
+  100% {
+    transform: rotate(-5deg);
+  }
+}
+
+@keyframes click {
+  0% {
+    transform: rotate(-30deg) translateY(0vh);
+  }
+  80% {
+    transform: rotate(-30deg) translateY(5vh);
+  }
+  100% {
+    transform: rotate(-30deg) translateY(0vh);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(0turn);
+  }
+  from {
+    transform: rotate(1turn);
+  }
+}
+
+@keyframes rotate {
+  from {
+    transform: rotate3d(var(--rx), var(--ry), var(--rz), 0turn);
+  }
+  to {
+    transform: rotate3d(var(--rx), var(--ry), var(--rz), 1turn);
+  }
+}
+
+/* Retro Arcade Prize Popup Styling */
+#app.gotcha .prize {
+  background: linear-gradient(180deg, #FFD700 0%, #FFA500 100%);
+  border: 8px solid #000;
+  border-radius: 16px;
+  padding: 4vh;
+  box-shadow: 8px 8px 0px #000;
+  position: relative;
+}
+
+#app.gotcha .prize button {
+  pointer-events: auto;
+}
+
+#app.gotcha .prize::before {
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  width: 20px;
+  height: 20px;
+  background: #FF1493;
+  border: 4px solid #000;
+  transform: rotate(45deg);
+}
+
+#app.gotcha .prize::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+  width: 20px;
+  height: 20px;
+  background: #00FFFF;
+  border: 4px solid #000;
+  transform: rotate(45deg);
+}
+
+#app.gotcha .shine::before {
+  content: '✨';
+  position: absolute;
+  font-size: 10vh;
+  color: #FFD700;
+  text-shadow:
+    0 0 20px #FFF,
+    -3px -3px 0 #000,
+    3px -3px 0 #000,
+    -3px 3px 0 #000,
+    3px 3px 0 #000;
+  animation: pixel-spin 2s steps(8) infinite;
+}

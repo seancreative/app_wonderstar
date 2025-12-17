@@ -1,0 +1,36 @@
+import React from 'react';
+import { Outlet, useLocation } from 'react-router-dom';
+import BottomNav from './BottomNav';
+import { useTheme } from '../../contexts/ThemeContext';
+
+const AppLayout: React.FC = () => {
+  const { theme } = useTheme();
+  const location = useLocation();
+
+  const getBackgroundClass = () => {
+    switch (theme) {
+      case 'dark':
+        return 'bg-gradient-to-br from-gray-900 via-primary-900 to-gray-800';
+      case 'colorful':
+        return 'bg-gradient-to-br from-pink-300 via-primary-300 to-blue-300';
+      case 'robotic':
+        return 'bg-gradient-to-br from-gray-800 via-slate-700 to-gray-900';
+      default:
+        return 'bg-gradient-to-br from-primary-100 via-silver-100 to-primary-50';
+    }
+  };
+
+  return (
+    <div className={`min-h-screen ${getBackgroundClass()} transition-colors duration-500 relative`}>
+      <main className="pb-20 min-h-screen">
+        <Outlet />
+      </main>
+      <BottomNav />
+      <div className="fixed bottom-20 left-2 z-50 bg-black/80 text-white text-[10px] px-2 py-1 rounded font-mono">
+        {location.pathname.split('/').pop() || 'home'}.tsx
+      </div>
+    </div>
+  );
+};
+
+export default AppLayout;

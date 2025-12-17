@@ -1,0 +1,28 @@
+{
+  "timestamp": "2025-11-27T01-03-06-341Z",
+  "supabaseUrl": "https://lfmfzvhonbjgmejrevat.supabase.co",
+  "tables": {
+    "users": [],
+    "child_profiles": [],
+    "wallet_transactions": [],
+    "stars_transactions": [],
+    "shop_orders": [],
+    "shop_cart_items": [],
+    "user_vouchers": [],
+    "voucher_redemptions": [],
+    "payment_transactions": [],
+    "redemptions": [],
+    "stamps_tracking": [],
+    "stamps_history": [],
+    "stamps_redemptions": [],
+    "order_item_redemptions": [],
+    "admin_users": [],
+    "staff_passcodes": []
+  },
+  "summary": {
+    "totalTables": 16,
+    "successCount": 16,
+    "failureCount": 0,
+    "totalRows": 0
+  }
+}

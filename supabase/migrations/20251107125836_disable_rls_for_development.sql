@@ -1,0 +1,30 @@
+/*
+  # Disable RLS for Development
+
+  This migration temporarily disables Row Level Security on all tables
+  to allow dev mode and testing to work without authentication.
+
+  ## Security Warning
+  This is for DEVELOPMENT ONLY. Re-enable RLS before production deployment.
+*/
+
+-- Disable RLS on all tables
+ALTER TABLE users DISABLE ROW LEVEL SECURITY;
+ALTER TABLE child_profiles DISABLE ROW LEVEL SECURITY;
+ALTER TABLE wallet_transactions DISABLE ROW LEVEL SECURITY;
+ALTER TABLE stars_transactions DISABLE ROW LEVEL SECURITY;
+ALTER TABLE membership_tiers DISABLE ROW LEVEL SECURITY;
+ALTER TABLE badges DISABLE ROW LEVEL SECURITY;
+ALTER TABLE missions DISABLE ROW LEVEL SECURITY;
+ALTER TABLE mission_progress DISABLE ROW LEVEL SECURITY;
+ALTER TABLE rewards DISABLE ROW LEVEL SECURITY;
+ALTER TABLE redemptions DISABLE ROW LEVEL SECURITY;
+ALTER TABLE mystery_boxes DISABLE ROW LEVEL SECURITY;
+ALTER TABLE mystery_box_openings DISABLE ROW LEVEL SECURITY;
+ALTER TABLE workshops DISABLE ROW LEVEL SECURITY;
+ALTER TABLE workshop_bookings DISABLE ROW LEVEL SECURITY;
+ALTER TABLE vouchers DISABLE ROW LEVEL SECURITY;
+ALTER TABLE voucher_usage DISABLE ROW LEVEL SECURITY;
+ALTER TABLE check_ins DISABLE ROW LEVEL SECURITY;
+ALTER TABLE notifications DISABLE ROW LEVEL SECURITY;
+ALTER TABLE app_config DISABLE ROW LEVEL SECURITY;
