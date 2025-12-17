@@ -37,7 +37,8 @@ const ShopCart: React.FC = () => {
   const { selectedOutlet, refreshCartCount, selectedVoucher, setSelectedVoucher, clearVoucher, appliedBonusAmount, setAppliedBonusAmount, clearBonus } = useShop();
   const { availableVouchers, loading: vouchersLoading, refresh: refreshVouchers } = useVouchers(user?.id);
   const { balances, loading: balancesLoading } = useMasterBalances({
-    userId: user?.id || null
+    userId: user?.id || null,
+    userEmail: user?.email || null
   });
   const bonusBalance = balances?.bonusBalance || 0;
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -95,7 +96,7 @@ const ShopCart: React.FC = () => {
         return Math.random() * (max - min) + min;
       }
 
-      const interval: any = setInterval(function() {
+      const interval: any = setInterval(function () {
         const timeLeft = animationEnd - Date.now();
 
         if (timeLeft <= 0) {
@@ -632,27 +633,27 @@ const ShopCart: React.FC = () => {
 
       {selectedOutlet && (
         <div className="max-w-md mx-auto px-4 mt-4">
-        <div className="glass-strong border-2 border-primary-500 rounded-2xl p-4 shadow-lg">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-2 h-2 bg-primary-500 rounded-full animate-pulse"></div>
-            <span className="text-xs font-bold text-primary-700 uppercase tracking-wide">Purchase Location</span>
-          </div>
-          <div className="flex items-start gap-3">
-            <div className="p-2 bg-primary-100 rounded-lg">
-              <MapPin className="w-5 h-5 text-primary-600" />
+          <div className="glass-strong border-2 border-primary-500 rounded-2xl p-4 shadow-lg">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-2 h-2 bg-primary-500 rounded-full animate-pulse"></div>
+              <span className="text-xs font-bold text-primary-700 uppercase tracking-wide">Purchase Location</span>
             </div>
-            <div className="flex-1">
-              <h3 className="text-base font-black text-gray-900">{selectedOutlet.name}</h3>
-              <p className="text-xs text-gray-600 mt-0.5">{selectedOutlet.location}</p>
-              <p className="text-xs text-gray-500 mt-0.5">{selectedOutlet.address}</p>
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-primary-100 rounded-lg">
+                <MapPin className="w-5 h-5 text-primary-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-base font-black text-gray-900">{selectedOutlet.name}</h3>
+                <p className="text-xs text-gray-600 mt-0.5">{selectedOutlet.location}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{selectedOutlet.address}</p>
+              </div>
+            </div>
+            <div className="mt-3 p-2 bg-orange-50 rounded-lg border border-orange-200">
+              <p className="text-xs text-orange-800 font-semibold">
+                ⚠️ All items in your cart are for this outlet only
+              </p>
             </div>
           </div>
-          <div className="mt-3 p-2 bg-orange-50 rounded-lg border border-orange-200">
-            <p className="text-xs text-orange-800 font-semibold">
-              ⚠️ All items in your cart are for this outlet only
-            </p>
-          </div>
-        </div>
         </div>
       )}
 
@@ -932,21 +933,19 @@ const ShopCart: React.FC = () => {
                 <button
                   onClick={appliedBonusAmount > 0 ? handleRemoveBonus : handleApplyBonus}
                   disabled={calculateSubtotal() - calculateDiscount() <= 0}
-                  className={`w-full p-3 rounded-xl border-2 transition-all text-left ${
-                    appliedBonusAmount > 0
+                  className={`w-full p-3 rounded-xl border-2 transition-all text-left ${appliedBonusAmount > 0
                       ? 'border-orange-400 bg-orange-50'
                       : bonusBalance > 0
-                      ? 'border-dashed border-orange-300 hover:border-orange-400 hover:bg-orange-50'
-                      : 'border-dashed border-gray-300 hover:border-gray-400 hover:bg-gray-50'
-                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                        ? 'border-dashed border-orange-300 hover:border-orange-400 hover:bg-orange-50'
+                        : 'border-dashed border-gray-300 hover:border-gray-400 hover:bg-gray-50'
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Gift className={`w-4 h-4 ${
-                        appliedBonusAmount > 0 || bonusBalance > 0
+                      <Gift className={`w-4 h-4 ${appliedBonusAmount > 0 || bonusBalance > 0
                           ? 'text-orange-600'
                           : 'text-gray-400'
-                      }`} />
+                        }`} />
                       <span className="text-sm font-bold text-gray-900">
                         {appliedBonusAmount > 0 ? 'Remove Bonus' : 'Apply Bonus Discount'}
                       </span>
@@ -1047,13 +1046,12 @@ const ShopCart: React.FC = () => {
                           }
                         }}
                         disabled={!canUse}
-                        className={`w-full p-4 rounded-xl border-2 text-left transition-all ${
-                          isSelected
+                        className={`w-full p-4 rounded-xl border-2 text-left transition-all ${isSelected
                             ? 'border-orange-500 bg-orange-50'
                             : canUse
-                            ? 'border-gray-200 bg-white hover:border-orange-300'
-                            : 'border-gray-200 bg-gray-50 opacity-60'
-                        }`}
+                              ? 'border-gray-200 bg-white hover:border-orange-300'
+                              : 'border-gray-200 bg-gray-50 opacity-60'
+                          }`}
                       >
                         <div className="flex items-start gap-3">
                           <div className="p-2 bg-orange-100 rounded-lg flex-shrink-0">

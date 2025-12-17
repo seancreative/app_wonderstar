@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, Wallet, CreditCard, Loader2, AlertCircle, Gift, Ticket, Star, Sparkles, ThumbsUp } from 'lucide-react';
+import { ArrowLeft, Wallet, CreditCard, Loader2, AlertCircle, Gift, Star, Sparkles, ThumbsUp, Trophy } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { fiuuService } from '../services/fiuuService';
-import PageHeader from '../components/Layout/PageHeader';
+import { wpayService } from '../services/wpayService';
 import BottomNav from '../components/Layout/BottomNav';
 import type { WalletTopupPackage } from '../types/database';
 
@@ -22,9 +21,20 @@ const WalletTopup: React.FC = () => {
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState('');
 
+  // WPay profile preview
+  const [wpayPreview, setWpayPreview] = useState<any>(null);
+  const [, setLoadingPreview] = useState(false);
+
   useEffect(() => {
     loadPackages();
   }, []);
+
+  // Load preview when package changes
+  useEffect(() => {
+    if (selectedPackage && user?.email) {
+      loadWPayPreview(selectedPackage.amount);
+    }
+  }, [selectedPackage, user?.email]);
 
   const loadPackages = async () => {
     try {
@@ -54,9 +64,30 @@ const WalletTopup: React.FC = () => {
     }
   };
 
+  const loadWPayPreview = async (amount: number) => {
+    if (!user?.email) return;
+
+    setLoadingPreview(true);
+    try {
+      const result = await wpayService.getTopupPreview(user.email, amount);
+      if (result.wpay_status === 'success') {
+        setWpayPreview(result);
+      }
+    } catch (err) {
+      console.error('[WPay] Failed to load preview:', err);
+    } finally {
+      setLoadingPreview(false);
+    }
+  };
+
   const handleTopup = async () => {
     if (!selectedPackage || !user) {
       setError('Please select a package and ensure you are logged in');
+      return;
+    }
+
+    if (!user.email) {
+      setError('User email is required for payment');
       return;
     }
 
@@ -64,219 +95,57 @@ const WalletTopup: React.FC = () => {
     setError('');
 
     try {
-      console.log('[Topup] Starting top-up process');
-      console.log('[Topup] User:', { id: user.id, name: user.name, email: user.email });
-      console.log('[Topup] Package:', selectedPackage);
-      console.log('[Topup] Payment method:', selectedPayment);
+      console.log('[WPay Topup] Starting top-up process');
+      console.log('[WPay Topup] User:', { id: user.id, name: user.name, email: user.email });
+      console.log('[WPay Topup] Package:', selectedPackage);
+      console.log('[WPay Topup] Payment method:', selectedPayment);
 
-      // Generate order number with TU- prefix for topup orders
-      const orderNumber = `TU-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
-      console.log('[Topup] Generated order_number:', orderNumber);
+      // Generate unique order ID
+      const orderId = wpayService.generateOrderId('TOP');
+      console.log('[WPay Topup] Generated order ID:', orderId);
 
-      console.log('[Topup] Step 1: Creating shop order for W Balance top-up');
-      const { data: shopOrder, error: orderError } = await supabase
-        .from('shop_orders')
-        .insert({
-          user_id: user.id,
-          outlet_id: null,
-          order_number: orderNumber,
-          items: [{
-            name: `W Balance Top-up RM${selectedPackage.amount}`,
-            quantity: 1,
-            price: selectedPackage.amount,
-            base_stars: selectedPackage.base_stars,
-            extra_stars: selectedPackage.extra_stars
-          }],
-          subtotal: selectedPackage.amount,
-          total_amount: selectedPackage.amount,
-          payment_method: selectedPayment,
-          payment_type: 'topup',
-          status: 'waiting_payment',
-          payment_status: 'pending',
-          metadata: {
-            is_topup: true,
-            package_id: selectedPackage.id,
-            base_stars: selectedPackage.base_stars,
-            extra_stars: selectedPackage.extra_stars,
-            bonus_amount: selectedPackage.bonus_amount
-          }
-        })
-        .select()
-        .single();
-
-      if (orderError) {
-        console.error('[Topup] Shop order creation failed:', orderError);
-        throw new Error(`Failed to create order: ${orderError.message}`);
-      }
-
-      if (!shopOrder?.id) {
-        console.error('[Topup] Order creation failed - no order returned:', shopOrder);
-        throw new Error('Order creation failed');
-      }
-
-      // Verify order_number matches what we generated
-      if (shopOrder.order_number !== orderNumber) {
-        console.warn('[Topup] Order number mismatch - expected:', orderNumber, 'got:', shopOrder.order_number);
-      }
-
-      console.log('[Topup] Shop order created successfully:', {
-        id: shopOrder.id,
-        order_number: shopOrder.order_number || orderNumber
+      // Call WPay API to process payment
+      const result = await wpayService.processPayment({
+        email: user.email,
+        payment_category: 'topup',
+        payment_type: 'online',
+        order_id: orderId,
+        amount: selectedPackage.amount,
+        payment_method: selectedPayment,
+        customer_name: user.name,
+        customer_phone: user.phone || '',
+        product_name: `W-Balance Top-up RM${selectedPackage.amount}`,
+        customer_country: user.country || 'MY',
+        metadata: {
+          package_id: selectedPackage.id,
+          base_stars: selectedPackage.base_stars,
+          extra_stars: selectedPackage.extra_stars,
+          bonus_amount: selectedPackage.bonus_amount,
+          user_id: user.id
+        }
       });
 
-      console.log('[Topup] Step 2: Creating wallet transaction');
-      const { data: walletTx, error: walletError } = await supabase
-        .from('wallet_transactions')
-        .insert({
-          user_id: user.id,
-          transaction_type: 'topup',
-          amount: selectedPackage.amount,
-          bonus_amount: selectedPackage.bonus_amount || 0,
-          status: 'pending',
-          description: `W Balance top-up ${orderNumber}`,
-          metadata: {
-            order_id: shopOrder.id,
-            order_number: orderNumber,
-            package_id: selectedPackage.id,
-            base_stars: selectedPackage.base_stars,
-            extra_stars: selectedPackage.extra_stars,
-            bonus_amount: selectedPackage.bonus_amount,
-            payment_method: selectedPayment
-          }
-        } as any)
-        .select()
-        .single();
+      console.log('[WPay Topup] API Response:', result);
 
-      if (walletError) {
-        console.error('[Topup] Wallet transaction creation failed:', walletError);
-        throw new Error(`Failed to create wallet transaction: ${walletError.message}`);
-      }
-
-      console.log('[Topup] Wallet transaction created successfully:', walletTx.id);
-
-      console.log('[Topup] Step 3: Creating payment transaction');
-      const { data: paymentTx, error: paymentError } = await supabase
-        .from('payment_transactions')
-        .insert({
-          order_id: orderNumber,
-          user_id: user.id,
-          amount: selectedPackage.amount,
-          payment_method: selectedPayment,
-          wallet_transaction_id: walletTx.id,
-          status: 'pending',
-          metadata: {
-            shop_order_id: shopOrder.id,
-            order_number: orderNumber,
-            package_id: selectedPackage.id,
-            base_stars: selectedPackage.base_stars,
-            extra_stars: selectedPackage.extra_stars,
-            bonus_amount: selectedPackage.bonus_amount
-          }
-        })
-        .select()
-        .single();
-
-      if (paymentError) {
-        console.error('[Topup] Payment transaction creation failed:', paymentError);
-        throw new Error(`Failed to create payment transaction: ${paymentError.message}`);
-      }
-
-      console.log('[Topup] Payment transaction created successfully:', paymentTx.id);
-
-      console.log('[Topup] Step 4a: Updating shop order with payment transaction');
-      const { error: updateOrderError } = await supabase
-        .from('shop_orders')
-        .update({ payment_transaction_id: paymentTx.id })
-        .eq('id', shopOrder.id);
-
-      if (updateOrderError) {
-        console.error('[Topup] Failed to update shop order:', updateOrderError);
+      if (result.wpay_status === 'pending' && result.payment_url && result.payment_data) {
+        // Online payment - redirect to Fiuu
+        console.log('[WPay Topup] Redirecting to payment gateway');
+        await wpayService.submitPaymentForm(result.payment_url, result.payment_data);
+      } else if (result.wpay_status === 'success') {
+        // Immediate success (shouldn't happen for online, but handle it)
+        console.log('[WPay Topup] Payment completed immediately');
+        navigate('/wpay/callback?wpay_status=success&order_id=' + orderId);
       } else {
-        console.log('[Topup] Shop order updated with payment transaction ID');
+        // Error
+        throw new Error(result.message || 'Payment failed');
       }
-
-      console.log('[Topup] Step 4b: Updating wallet transaction with payment transaction');
-      const { error: updateWalletError } = await supabase
-        .from('wallet_transactions')
-        .update({ payment_transaction_id: paymentTx.id })
-        .eq('id', walletTx.id);
-
-      if (updateWalletError) {
-        console.error('[Topup] Failed to update wallet transaction:', updateWalletError);
-      } else {
-        console.log('[Topup] Wallet transaction updated with payment transaction ID');
-      }
-
-      console.log('[Topup] Step 5: Initiating payment with Fiuu');
-      const paymentMethod = fiuuService.mapPaymentMethodToFiuu(selectedPayment);
-      console.log('[Topup] Mapped payment method:', paymentMethod);
-
-      let paymentResponse;
-      try {
-        const initiatePaymentPromise = fiuuService.initiatePayment({
-          customer_id: user.id,
-          user_id: user.id,
-          product_id: `TOPUP-${selectedPackage.amount}`,
-          order_id: orderNumber, // ✅ FIXED: Use generated orderNumber instead of relying on database return
-          shop_order_id: shopOrder.id, // ✅ CRITICAL: Pass shop_order_id so Laravel can update it
-          wallet_transaction_id: walletTx.id,
-          amount: selectedPackage.amount,
-          payment_method: paymentMethod,
-          customer_name: user.name,
-          customer_email: user.email,
-          customer_phone: user.phone || '',
-          product_name: `W Balance Top-up RM${selectedPackage.amount} (${selectedPackage.base_stars + selectedPackage.extra_stars} stars)`,
-          customer_country: user.country || 'MY'
-        });
-
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Connection timeout - payment gateway is not responding')), 30000)
-        );
-
-        paymentResponse = await Promise.race([initiatePaymentPromise, timeoutPromise]);
-        console.log('[Topup] Payment initiated successfully');
-      } catch (initiateError) {
-        console.error('[Topup] Failed to initiate payment:', initiateError);
-        const errorMsg = initiateError instanceof Error ? initiateError.message : 'Failed to initialize payment';
-        throw new Error(errorMsg);
-      }
-
-      if (!paymentResponse?.data?.payment_url || !paymentResponse?.data?.payment_data) {
-        console.error('[Topup] Invalid payment response:', paymentResponse);
-        throw new Error('Invalid payment response from provider. Please try again.');
-      }
-
-      console.log('[Topup] Updating transaction with payment URL');
-      await supabase
-        .from('payment_transactions')
-        .update({
-          fiuu_payment_url: paymentResponse.data.payment_url,
-          fiuu_payment_data: paymentResponse.data.payment_data,
-          status: 'processing'
-        })
-        .eq('id', paymentTx.id);
-
-      console.log('[Topup] Redirecting to payment gateway');
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      await fiuuService.submitPaymentForm(
-        paymentResponse.data.payment_url,
-        paymentResponse.data.payment_data
-      );
 
     } catch (err) {
-      console.error('[Topup] Fatal error in top-up process:', err);
-      console.error('[Topup] Error details:', {
-        message: err instanceof Error ? err.message : String(err),
-        stack: err instanceof Error ? err.stack : undefined,
-        type: err instanceof Error ? err.constructor.name : typeof err
-      });
-
+      console.error('[WPay Topup] Error:', err);
       let errorMessage = 'Failed to process top-up';
       if (err instanceof Error) {
         errorMessage = err.message;
       }
-
       setError(errorMessage);
       setProcessing(false);
     }
@@ -289,6 +158,17 @@ const WalletTopup: React.FC = () => {
     { id: 'tng', name: 'Touch n Go', icon: '🔵' },
   ];
 
+  const getTierColor = (tier: string) => {
+    const colors: Record<string, string> = {
+      bronze: 'text-amber-700',
+      silver: 'text-gray-500',
+      gold: 'text-yellow-500',
+      platinum: 'text-blue-400',
+      vip: 'text-red-600',
+    };
+    return colors[tier] || colors.bronze;
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-primary-50 to-white flex items-center justify-center">
@@ -298,14 +178,51 @@ const WalletTopup: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-primary-50 to-white pb-28">
-      <PageHeader
-        title="Top Up W Balance"
-        leftIcon={<ArrowLeft />}
-        onLeftClick={() => navigate('/wallet')}
-      />
+    <div className="min-h-screen pb-28 pt-4 bg-gradient-to-b from-primary-50 to-white">
+      {/* Custom Header */}
+      <div className="glass border-b border-white/20 backdrop-blur-2xl fixed top-0 left-0 right-0 z-50 max-w-md mx-auto">
+        <div className="px-4 py-3 flex items-center gap-3">
+          <button
+            onClick={() => navigate('/wallet')}
+            className="p-2 hover:bg-white/50 rounded-xl transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5 text-gray-700" />
+          </button>
+          <h1 className="text-lg font-bold text-gray-900">Top Up W Balance</h1>
+        </div>
+      </div>
 
       <div className="max-w-md mx-auto p-4 space-y-6 mt-16">
+        {/* WPay Profile Preview */}
+        {wpayPreview?.profile && (
+          <div className="glass-strong rounded-3xl p-4 bg-gradient-to-r from-primary-50 to-purple-50 border-2 border-primary-200">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Trophy className={`w-5 h-5 ${getTierColor(wpayPreview.profile.tier_type)}`} />
+                <span className="font-bold text-gray-800 capitalize">{wpayPreview.profile.tier_type} Member</span>
+              </div>
+              <div className="text-xs text-gray-600">
+                {wpayPreview.profile.tier_factor}x Stars
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-center text-sm">
+              <div className="bg-white/60 rounded-xl p-2">
+                <div className="text-gray-600 text-xs">W-Balance</div>
+                <div className="font-bold text-primary-600">RM{wpayPreview.profile.wbalance.toFixed(2)}</div>
+              </div>
+              <div className="bg-white/60 rounded-xl p-2">
+                <div className="text-gray-600 text-xs">Bonus</div>
+                <div className="font-bold text-orange-600">RM{wpayPreview.profile.bonus.toFixed(2)}</div>
+              </div>
+              <div className="bg-white/60 rounded-xl p-2">
+                <div className="text-gray-600 text-xs">Stars</div>
+                <div className="font-bold text-yellow-600">{wpayPreview.profile.stars}</div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Package Selection */}
         <div className="glass-strong rounded-3xl p-6 space-y-4">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center shadow-lg">
@@ -324,8 +241,8 @@ const WalletTopup: React.FC = () => {
                   key={pkg.id}
                   onClick={() => setSelectedPackage(pkg)}
                   className={`p-4 rounded-2xl border-2 transition-all relative overflow-hidden ${selectedPackage?.id === pkg.id
-                      ? 'border-primary-500 bg-primary-50 shadow-lg scale-105'
-                      : 'border-gray-200 bg-white hover:border-primary-300'
+                    ? 'border-primary-500 bg-primary-50 shadow-lg scale-105'
+                    : 'border-gray-200 bg-white hover:border-primary-300'
                     }`}
                 >
                   {pkg.bonus_amount > 0 && (
@@ -374,6 +291,7 @@ const WalletTopup: React.FC = () => {
           </div>
         </div>
 
+        {/* Payment Method */}
         <div className="glass-strong rounded-3xl p-6 space-y-4">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center shadow-lg">
@@ -391,8 +309,8 @@ const WalletTopup: React.FC = () => {
                 key={method.id}
                 onClick={() => setSelectedPayment(method.id as PaymentMethod)}
                 className={`w-full p-4 rounded-2xl border-2 transition-all flex items-center gap-3 ${selectedPayment === method.id
-                    ? 'border-primary-500 bg-primary-50 shadow-lg'
-                    : 'border-gray-200 bg-white hover:border-primary-300'
+                  ? 'border-primary-500 bg-primary-50 shadow-lg'
+                  : 'border-gray-200 bg-white hover:border-primary-300'
                   }`}
               >
                 <span className="text-2xl">{method.icon}</span>
@@ -402,6 +320,7 @@ const WalletTopup: React.FC = () => {
           </div>
         </div>
 
+        {/* Summary */}
         {selectedPackage && (
           <div className="glass-strong rounded-3xl p-6 space-y-4">
             <h3 className="font-black text-gray-900 mb-3">Summary</h3>
@@ -426,6 +345,34 @@ const WalletTopup: React.FC = () => {
                   <span className="font-bold text-orange-600">RM{selectedPackage.bonus_amount} Bonus</span>
                 </div>
               )}
+
+              {/* WPay Preview Section */}
+              {wpayPreview?.preview && (
+                <>
+                  <div className="border-t border-gray-200 pt-2 mt-2"></div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">WPay Stars (with {wpayPreview.profile.tier_factor}x multiplier)</span>
+                    <span className="font-bold text-yellow-600">+{wpayPreview.preview.stars_to_award} stars</span>
+                  </div>
+                  {wpayPreview.preview.bonus_to_award > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">WPay Tier Bonus</span>
+                      <span className="font-bold text-green-600">+RM{wpayPreview.preview.bonus_to_award.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {wpayPreview.preview.tier_upgrade && (
+                    <div className="bg-gradient-to-r from-purple-100 to-pink-100 rounded-xl p-3 mt-2">
+                      <div className="flex items-center gap-2 text-purple-700">
+                        <Trophy className="w-5 h-5" />
+                        <span className="font-bold text-sm">
+                          🎉 You'll upgrade to {wpayPreview.preview.new_tier.toUpperCase()}!
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
               <div className="border-t border-gray-200 pt-2 mt-2">
                 <div className="flex justify-between text-lg">
                   <span className="font-black text-gray-900">Total Payment</span>

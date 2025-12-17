@@ -1,4 +1,6 @@
-const FIUU_BASE_URL = 'https://app.aigenius.com.my';
+import { API_BASE_URL } from '../config/api';
+
+const FIUU_BASE_URL = API_BASE_URL;
 
 const FIUU_HEADERS = {
   'Content-Type': 'application/json',
@@ -128,7 +130,7 @@ class FiuuService {
     return response.data;
   }
 
- mapPaymentMethodToFiuu(method: string): string {
+  mapPaymentMethodToFiuu(method: string): string {
     // No conversion - pass through the exact payment method
     // So 'tng' stays 'tng', 'grabpay' stays 'grabpay', etc.
     return method;

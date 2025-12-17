@@ -3,12 +3,12 @@ import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { CheckCircle, Star, QrCode, Calendar, Package } from 'lucide-react';
 import { useStars } from '../hooks/useStars';
 import { useAuth } from '../contexts/AuthContext';
+import { wpayService, WPayProfile } from '../services/wpayService';
 import BonusSummary from '../components/BonusSummary';
 import PageHeader from '../components/Layout/PageHeader';
 import BottomNav from '../components/Layout/BottomNav';
 import QRCodeDisplay from '../components/QRCodeDisplay';
 import { supabase } from '../lib/supabase';
-import { wpayService } from '../services/wpayService';
 
 interface Order {
   id: string;
@@ -26,65 +26,43 @@ interface Order {
 
 const OrderSuccess: React.FC = () => {
   const navigate = useNavigate();
-  const location = useLocation();
+  const location = useLocation() as any; // Cast to access state
   const { orderId } = useParams<{ orderId: string }>();
   const { currentTier } = useStars();
-  const { user, reloadUser } = useAuth();
+  const { user } = useAuth();
 
+  const [wpayProfile, setWpayProfile] = useState<WPayProfile | null>(null);
   const [order, setOrder] = useState<Order | null>(location.state?.order || null);
   const [showQR, setShowQR] = useState(false);
   const [loading, setLoading] = useState(!location.state?.order);
-  const [tierInfo, setTierInfo] = useState<{ type: string; multiplier: number } | null>(null);
+
+  useEffect(() => {
+    if (user?.email) {
+      wpayService.getProfile(user.email).then(res => {
+        if (res.profile) {
+          setWpayProfile(res.profile);
+        }
+      }).catch(err => console.error('Error fetching WPay profile:', err));
+    }
+  }, [user]);
 
   useEffect(() => {
     // If order is not in location state, fetch it from database
     if (!order && orderId) {
       fetchOrder();
+    } else if (order && order.stars_earned === 0 && order.order_number.startsWith('WP')) {
+      // If stars are 0, try to fetch from WPay API to get accurate stars_awarded
+      wpayService.getTransaction(order.order_number).then((tx: any) => {
+        // wpayService.getTransaction might return the transaction object directly
+        // Check if tx has stars_awarded or if it's nested
+        const starsFn = tx?.stars_awarded ?? tx?.transaction?.stars_awarded;
+
+        if (typeof starsFn === 'number' && starsFn > 0) {
+          setOrder(prev => prev ? ({ ...prev, stars_earned: starsFn }) : null);
+        }
+      }).catch(err => console.log('Could not fetch WPay tx', err));
     }
   }, [orderId, order]);
-
-  // Fetch accurate stars and tier info from WPay backend
-  useEffect(() => {
-    const fetchWPayData = async () => {
-      if (!order?.order_number || !user?.email) return;
-
-      try {
-        // Fetch transaction details if stars_earned is 0 or missing
-        if (!order.stars_earned || order.stars_earned === 0) {
-          console.log('[OrderSuccess] Fetching accurate stars from WPay API');
-          const transactionResponse = await wpayService.getTransaction(order.order_number);
-
-          if (transactionResponse.success && transactionResponse.data) {
-            console.log('[OrderSuccess] WPay transaction data:', transactionResponse.data);
-            setOrder(prev => prev ? {
-              ...prev,
-              stars_earned: transactionResponse.data.stars_awarded
-            } : null);
-          }
-        }
-
-        // Fetch latest tier info from WPay
-        console.log('[OrderSuccess] Fetching tier info from WPay API');
-        const profileResponse = await wpayService.getProfile(user.email);
-
-        if (profileResponse.success && profileResponse.data) {
-          console.log('[OrderSuccess] WPay profile data:', profileResponse.data);
-          setTierInfo({
-            type: profileResponse.data.tier_type,
-            multiplier: profileResponse.data.tier_multiplier
-          });
-
-          // Reload user to update cached tier info
-          await reloadUser();
-        }
-      } catch (error) {
-        console.error('[OrderSuccess] Error fetching WPay data:', error);
-        // Continue with existing data if WPay fails
-      }
-    };
-
-    fetchWPayData();
-  }, [order?.order_number, user?.email]);
 
   const fetchOrder = async () => {
     if (!orderId) return;
@@ -100,6 +78,19 @@ const OrderSuccess: React.FC = () => {
 
       if (data) {
         setOrder(data as Order);
+
+        // Double check WPay for stars if 0
+        if (data.stars_earned === 0 && data.order_number.startsWith('WP')) {
+          try {
+            const tx = await wpayService.getTransaction(data.order_number);
+            const starsFn = (tx as any)?.stars_awarded ?? (tx as any)?.transaction?.stars_awarded;
+            if (typeof starsFn === 'number' && starsFn > 0) {
+              setOrder(prev => ({ ...prev!, stars_earned: starsFn }));
+            }
+          } catch (e) {
+            console.error('Error fetching WPay tx', e);
+          }
+        }
       } else {
         navigate('/home');
       }
@@ -109,6 +100,20 @@ const OrderSuccess: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const getTierName = () => {
+    if (wpayProfile?.tier_type) {
+      return wpayProfile.tier_type.charAt(0).toUpperCase() + wpayProfile.tier_type.slice(1);
+    }
+    return currentTier?.name || 'Silver';
+  };
+
+  const getTierMultiplier = () => {
+    if (wpayProfile?.tier_factor) {
+      return wpayProfile.tier_factor;
+    }
+    return currentTier?.earn_multiplier || 1;
   };
 
   if (loading) {
@@ -130,7 +135,8 @@ const OrderSuccess: React.FC = () => {
       fpx: 'FPX Online Banking',
       grabpay: 'GrabPay',
       tng: 'Touch \'n Go eWallet',
-      boost: 'Boost'
+      boost: 'Boost',
+      free_reward: 'Free Reward'
     };
     return methods[method] || method;
   };
@@ -207,10 +213,10 @@ const OrderSuccess: React.FC = () => {
         </div>
 
         <BonusSummary
-          tierName={tierInfo?.type || currentTier?.name || 'Silver'}
+          tierName={getTierName()}
           tierDiscountPct={order.tier_discount_pct || 0}
           tierDiscountAmount={order.tier_discount_amount || 0}
-          tierMultiplier={tierInfo?.multiplier || currentTier?.earn_multiplier || 1}
+          tierMultiplier={getTierMultiplier()}
           starsEarned={order.stars_earned}
           stampsEarned={order.stamps_earned || 0}
           hasVouchers={true}

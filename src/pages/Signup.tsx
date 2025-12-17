@@ -3,10 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { ArrowLeft, User, Mail, Phone, Lock, Sparkles, MapPin, Globe, Shield, Check, AlertCircle, Loader2 } from 'lucide-react';
 import ProductShowcase from '../components/ProductShowcase';
+import { API_BASE_URL } from '../config/api';
 
 const Signup: React.FC = () => {
-  // Laravel API Base URL - Change this to your Laravel backend URL
-  const API_BASE_URL = 'https://app.aigenius.com.my';
 
   const navigate = useNavigate();
   const { signup } = useAuth();

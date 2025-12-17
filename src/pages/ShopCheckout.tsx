@@ -10,6 +10,7 @@ import { useStars } from '../hooks/useStars';
 import { useStamps } from '../hooks/useStamps';
 import { useVouchers } from '../hooks/useVouchers';
 import { fiuuService } from '../services/fiuuService';
+import { wpayService } from '../services/wpayService';
 import { activityTimelineService } from '../services/activityTimelineService';
 import PageHeader from '../components/Layout/PageHeader';
 import BottomNav from '../components/Layout/BottomNav';
@@ -42,7 +43,8 @@ const ShopCheckout: React.FC = () => {
   const { selectedOutlet, refreshCartCount, selectedVoucher: contextVoucher, setSelectedVoucher: setContextVoucher, clearVoucher, appliedBonusAmount, setAppliedBonusAmount, clearBonus } = useShop();
   const { spend } = useWallet(); // Keep for spending function only
   const { balances, loading: balancesLoading } = useMasterBalances({
-    userId: user?.id || null
+    userId: user?.id || null,
+    userEmail: user?.email || null
   });
   const balance = balances?.wBalance || 0;
   const bonusBalance = balances?.bonusBalance || 0;
@@ -820,67 +822,60 @@ const ShopCheckout: React.FC = () => {
         });
       }
 
-      // Calculate values needed for payment and order creation
+      // For online payments (card, fpx, etc.), use Fiuu flow
+      if (selectedPayment !== 'wonderstars') {
+        await handleFiuuPayment(orderNumber, total, orderItems);
+        return;
+      }
+
+      // For W-Balance payments, use WPay API
+      console.log('[Payment] Processing W-Balance payment via WPay API');
+
+      // Calculate gross amount (the true cost before bonus deduction)
+      // because WPay handles the bonus deduction logic itself
+      const grossPaymentAmount = total + (appliedBonusAmount || 0);
+
+      const wpayResponse = await wpayService.processPayment({
+        email: user.email,
+        payment_category: 'checkout',
+        payment_type: 'wbalance',
+        order_id: orderNumber,
+        amount: grossPaymentAmount,
+        customer_name: user.name,
+        customer_phone: user.phone || '',
+        product_name: `Shop order ${orderNumber} - ${cartItems.length} item(s)`,
+        metadata: {
+          outlet_id: outletId,
+          outlet_name: selectedOutlet?.name,
+          items_count: cartItems.length,
+          voucher_code: selectedVoucher ? (selectedVoucher.voucher || selectedVoucher).code : null,
+          voucher_discount: calculateDiscount(),
+          tier_discount: calculateTierDiscount(),
+          use_bonus: appliedBonusAmount || 0 // Explicitly tell backend how much bonus to use
+        }
+      });
+
+      if (wpayResponse.wpay_status !== 'success') {
+        console.error('[Payment] WPay payment failed:', wpayResponse);
+        throw new Error(wpayResponse.message || 'Payment failed. Please check your balance.');
+      }
+
+      console.log('[Payment] ✅ WPay payment successful:', {
+        order_id: wpayResponse.order_id,
+        wbalance_used: wpayResponse.transaction_details?.wbalance_used,
+        bonus_used: wpayResponse.transaction_details?.bonus_used,
+        new_wbalance: wpayResponse.profile?.wbalance,
+        new_bonus: wpayResponse.profile?.bonus
+      });
+
       const stampsEarnedCount = calculateStampsFromOrder(orderItems);
       const tierDiscountAmount = calculateTierDiscount();
       const voucherDiscount = calculateDiscount();
       const grossSales = calculateSubtotal();
 
-      let wpayResponse;
-      let starsAwarded = 0;
-
-      if (selectedPayment === 'wonderstars') {
-        // For W-Balance payments, use WPay API
-        console.log('[Payment] Processing W-Balance payment via WPay API');
-
-        // Calculate gross amount (the true cost before bonus deduction)
-        // because WPay handles the bonus deduction logic itself
-        const grossPaymentAmount = total + (appliedBonusAmount || 0);
-
-        try {
-          wpayResponse = await wpayService.processPayment({
-            email: user.email,
-            payment_category: 'checkout',
-            payment_type: 'wbalance',
-            order_id: orderNumber,
-            amount: grossPaymentAmount,
-            customer_name: user.name,
-            customer_phone: user.phone || '',
-            product_name: `Shop order ${orderNumber} - ${cartItems.length} item(s)`,
-            metadata: {
-              outlet_id: outletId,
-              outlet_name: selectedOutlet?.name,
-              items_count: cartItems.length,
-              voucher_code: selectedVoucher ? (selectedVoucher.voucher || selectedVoucher).code : null,
-              voucher_discount: voucherDiscount,
-              tier_discount: tierDiscountAmount,
-              use_bonus: appliedBonusAmount || 0
-            }
-          });
-
-          if (wpayResponse.wpay_status !== 'success') {
-            throw new Error(wpayResponse.message || 'Payment failed');
-          }
-
-          // Extract stars from WPay response
-          starsAwarded = wpayResponse.transaction_details?.stars_awarded || 0;
-
-          console.log('[Payment] ✅ WPay payment successful:', {
-            order_id: wpayResponse.order_id,
-            transaction_id: wpayResponse.transaction_id,
-            stars_awarded: starsAwarded,
-            wbalance_used: wpayResponse.transaction_details?.wbalance_used,
-            bonus_used: wpayResponse.transaction_details?.bonus_used
-          });
-
-        } catch (wpayError: any) {
-          console.error('[Payment] ❌ WPay payment failed:', wpayError);
-          throw new Error(`Payment failed: ${wpayError?.message || 'WPay error'}`);
-        }
-      } else {
-        await handleFiuuPayment(orderNumber, total, orderItems);
-        return;
-      }
+      // Get actual bonus used and stars awarded from WPay response
+      const actualBonusUsed = wpayResponse.transaction_details?.bonus_used || 0;
+      const actualStarsAwarded = wpayResponse.transaction_details?.stars_awarded ?? calculateStarsEarning();
 
       const orderData: any = {
         order_number: orderNumber,
@@ -890,22 +885,25 @@ const ShopCheckout: React.FC = () => {
         subtotal: grossSales,
         gross_sales: grossSales,
         discount_amount: voucherDiscount,
-        bonus_discount_amount: appliedBonusAmount || 0,
+        bonus_discount_amount: actualBonusUsed,
         permanent_discount_amount: tierDiscountAmount,
         tier_discount_amount: tierDiscountAmount,
         tier_discount_pct: currentTier?.shop_discount_pct || 0,
         total_amount: total,
         payment_method: selectedPayment,
         payment_type: 'deduction',
-        stars_earned: starsAwarded,
+        stars_earned: actualStarsAwarded, // Use actual stars from WPay
         stamps_earned: stampsEarnedCount,
         qr_code: qrCode,
         status: 'ready',
         payment_status: 'paid',
         fnbstatus: 'preparing',
         metadata: {
-          bonus_discount_amount: appliedBonusAmount || 0,
-          wpay_transaction_id: wpayResponse?.transaction_id
+          bonus_discount_amount: actualBonusUsed,
+          stars_awarded: actualStarsAwarded,
+          wpay_transaction_id: wpayResponse.transaction_id,
+          wbalance_used: wpayResponse.transaction_details?.wbalance_used,
+          bonus_used: wpayResponse.transaction_details?.bonus_used
         }
       };
 
@@ -914,6 +912,8 @@ const ShopCheckout: React.FC = () => {
         orderData.voucher_id = selectedVoucher.voucher_id;
         orderData.voucher_code = (selectedVoucher.voucher || selectedVoucher).code;
       }
+
+      // WPay already handled the bonus deduction, no need to call Supabase RPC
 
       const { data: order, error: orderError } = await supabase
         .from('shop_orders')
@@ -964,9 +964,14 @@ const ShopCheckout: React.FC = () => {
         console.warn('Failed to create redemption records, but order was successful:', redemptionError);
       }
 
-      // Stars are already handled by WPay backend for W-Balance payments
-      // No need to call earnStars locally
-      console.log('[Payment] Stars already awarded by WPay backend:', starsAwarded);
+      try {
+        await earnStars(calculateStarsEarning(), 'shop_purchase', {
+          order_id: order.id,
+          payment_method: selectedPayment
+        });
+      } catch (starsError) {
+        console.warn('Failed to award stars, but order was successful:', starsError);
+      }
 
       try {
         const stampsEarned = calculateStampsFromOrder(orderItems);
@@ -1105,50 +1110,6 @@ const ShopCheckout: React.FC = () => {
       const voucherDiscount = calculateDiscount();
       const grossSales = calculateSubtotal();
 
-      // Process free order via WPay API
-      console.log('[Free Order] Processing free order via WPay API');
-
-      // The amount is what was covered by vouchers/bonus
-      const amountBeforeDiscounts = grossSales - tierDiscountAmount - voucherDiscount;
-
-      let wpayResponse;
-      try {
-        wpayResponse = await wpayService.processPayment({
-          email: user.email,
-          payment_category: 'checkout',
-          payment_type: 'free',
-          order_id: orderNumber,
-          amount: amountBeforeDiscounts,
-          customer_name: user.name,
-          customer_phone: user.phone || '',
-          product_name: `Free order ${orderNumber} - ${cartItems.length} item(s)`,
-          metadata: {
-            outlet_id: outletId,
-            outlet_name: selectedOutlet?.name,
-            items_count: cartItems.length,
-            voucher_code: selectedVoucher ? (selectedVoucher.voucher || selectedVoucher).code : null,
-            voucher_discount: voucherDiscount,
-            tier_discount: tierDiscountAmount,
-            use_bonus: appliedBonusAmount || 0,
-            is_free_order: true
-          }
-        });
-
-        if (wpayResponse.wpay_status !== 'success') {
-          throw new Error(wpayResponse.message || 'Free order processing failed');
-        }
-
-        console.log('[Free Order] ✅ WPay free order successful:', {
-          order_id: wpayResponse.order_id,
-          transaction_id: wpayResponse.transaction_id,
-          bonus_used: wpayResponse.transaction_details?.bonus_used
-        });
-
-      } catch (wpayError: any) {
-        console.error('[Free Order] ❌ WPay free order failed:', wpayError);
-        throw new Error(`Free order failed: ${wpayError?.message || 'WPay error'}`);
-      }
-
       const orderData: any = {
         order_number: orderNumber,
         user_id: user.id,
@@ -1171,8 +1132,7 @@ const ShopCheckout: React.FC = () => {
         payment_status: 'paid',
         fnbstatus: 'preparing',
         metadata: {
-          bonus_discount_amount: appliedBonusAmount || 0,
-          wpay_transaction_id: wpayResponse?.transaction_id
+          bonus_discount_amount: appliedBonusAmount || 0
         }
       };
 
@@ -1181,6 +1141,50 @@ const ShopCheckout: React.FC = () => {
         orderData.voucher_id = selectedVoucher.voucher_id;
         orderData.voucher_code = (selectedVoucher.voucher || selectedVoucher).code;
       }
+
+      // If there's an amount that needs to be paid from bonus, use WPay
+      const amountBeforeDiscounts = grossSales - tierDiscountAmount - voucherDiscount;
+      if (amountBeforeDiscounts > 0) {
+        console.log('[Free Order] Processing via WPay with payment_type: free');
+        console.log('[Free Order] Amount to cover with bonus:', amountBeforeDiscounts);
+
+        const wpayResponse = await wpayService.processPayment({
+          email: user.email,
+          payment_category: 'checkout',
+          payment_type: 'free', // Use 'free' payment type - uses only bonus
+          order_id: orderNumber,
+          amount: amountBeforeDiscounts,
+          customer_name: user.name,
+          customer_phone: user.phone || '',
+          product_name: `Free order ${orderNumber} - ${cartItems.length} item(s)`,
+          metadata: {
+            outlet_id: outletId,
+            outlet_name: selectedOutlet?.name,
+            items_count: cartItems.length,
+            voucher_code: selectedVoucher ? (selectedVoucher.voucher || selectedVoucher).code : null,
+            voucher_discount: voucherDiscount,
+            tier_discount: tierDiscountAmount,
+            is_free_order: true
+          }
+        });
+
+        if (wpayResponse.wpay_status !== 'success') {
+          console.error('[Free Order] WPay payment failed:', wpayResponse);
+          throw new Error(wpayResponse.message || 'Payment failed. Please check your bonus balance.');
+        }
+
+        console.log('[Free Order] ✅ WPay payment successful:', {
+          order_id: wpayResponse.order_id,
+          bonus_used: wpayResponse.transaction_details?.bonus_used,
+          new_bonus: wpayResponse.profile?.bonus
+        });
+
+        // Update order data with actual bonus used from WPay
+        orderData.bonus_discount_amount = wpayResponse.transaction_details?.bonus_used || 0;
+        orderData.metadata.wpay_transaction_id = wpayResponse.transaction_id;
+        orderData.metadata.bonus_used = wpayResponse.transaction_details?.bonus_used;
+      }
+      // If no amount needs to be paid (100% discount from voucher/tier), skip WPay call
 
       const { data: order, error: orderError } = await supabase
         .from('shop_orders')
@@ -1376,8 +1380,8 @@ const ShopCheckout: React.FC = () => {
           voucherCode={voucherCode}
           voucherTitle={voucherTitle}
           isApplied={true}
-          onApply={() => {}}
-          onRemove={() => {}}
+          onApply={() => { }}
+          onRemove={() => { }}
         />
       )}
       <div className={`fixed left-0 right-0 z-40 glass border-b border-white/20 backdrop-blur-2xl max-w-md mx-auto ${selectedVoucher ? 'top-[120px]' : 'top-[72px]'}`}>
@@ -1565,27 +1569,24 @@ const ShopCheckout: React.FC = () => {
         <button
           onClick={handleBonusClick}
           disabled={appliedBonusAmount > 0}
-          className={`w-full glass p-4 rounded-2xl flex items-center justify-between transition-all ${
-            appliedBonusAmount > 0
-              ? 'cursor-default'
-              : 'hover:shadow-md cursor-pointer active:scale-[0.98]'
-          }`}
+          className={`w-full glass p-4 rounded-2xl flex items-center justify-between transition-all ${appliedBonusAmount > 0
+            ? 'cursor-default'
+            : 'hover:shadow-md cursor-pointer active:scale-[0.98]'
+            }`}
         >
           <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-lg ${
-              appliedBonusAmount > 0
-                ? 'bg-orange-500'
-                : bonusBalance > 0
+            <div className={`p-2 rounded-lg ${appliedBonusAmount > 0
+              ? 'bg-orange-500'
+              : bonusBalance > 0
                 ? 'bg-orange-100'
                 : 'bg-gray-100'
-            }`}>
-              <Gift className={`w-5 h-5 ${
-                appliedBonusAmount > 0
-                  ? 'text-white'
-                  : bonusBalance > 0
+              }`}>
+              <Gift className={`w-5 h-5 ${appliedBonusAmount > 0
+                ? 'text-white'
+                : bonusBalance > 0
                   ? 'text-orange-600'
                   : 'text-gray-400'
-              }`} />
+                }`} />
             </div>
             <div className="text-left">
               <h3 className="font-bold text-gray-900 text-sm">
@@ -1623,19 +1624,16 @@ const ShopCheckout: React.FC = () => {
 
           <button
             onClick={() => setSelectedPayment('wonderstars')}
-            className={`w-full p-3 rounded-xl border-2 transition-all text-left ${
-              selectedPayment === 'wonderstars'
-                ? 'border-primary-500 bg-primary-50'
-                : 'border-gray-200 bg-white hover:border-gray-300'
-            }`}
+            className={`w-full p-3 rounded-xl border-2 transition-all text-left ${selectedPayment === 'wonderstars'
+              ? 'border-primary-500 bg-primary-50'
+              : 'border-gray-200 bg-white hover:border-gray-300'
+              }`}
           >
             <div className="flex items-start gap-3">
-              <div className={`p-2 rounded-lg ${
-                selectedPayment === 'wonderstars' ? 'bg-primary-500' : 'bg-gray-100'
-              }`}>
-                <Wallet className={`w-5 h-5 ${
-                  selectedPayment === 'wonderstars' ? 'text-white' : 'text-gray-600'
-                }`} />
+              <div className={`p-2 rounded-lg ${selectedPayment === 'wonderstars' ? 'bg-primary-500' : 'bg-gray-100'
+                }`}>
+                <Wallet className={`w-5 h-5 ${selectedPayment === 'wonderstars' ? 'text-white' : 'text-gray-600'
+                  }`} />
               </div>
 
               <div className="flex-1">
@@ -1685,9 +1683,8 @@ const ShopCheckout: React.FC = () => {
                   <p className="text-xs text-gray-600">Card, FPX, GrabPay, TnG, Boost</p>
                 </div>
               </div>
-              <ChevronRight className={`w-5 h-5 text-gray-400 transition-transform ${
-                showOtherPayments ? 'rotate-90' : ''
-              }`} />
+              <ChevronRight className={`w-5 h-5 text-gray-400 transition-transform ${showOtherPayments ? 'rotate-90' : ''
+                }`} />
             </div>
           </button>
 
@@ -1701,19 +1698,16 @@ const ShopCheckout: React.FC = () => {
                   <button
                     key={method.id}
                     onClick={() => setSelectedPayment(method.id)}
-                    className={`w-full p-3 rounded-xl border-2 transition-all text-left ${
-                      isSelected
-                        ? 'border-primary-500 bg-primary-50'
-                        : 'border-gray-200 bg-white hover:border-gray-300'
-                    }`}
+                    className={`w-full p-3 rounded-xl border-2 transition-all text-left ${isSelected
+                      ? 'border-primary-500 bg-primary-50'
+                      : 'border-gray-200 bg-white hover:border-gray-300'
+                      }`}
                   >
                     <div className="flex items-start gap-3">
-                      <div className={`p-2 rounded-lg ${
-                        isSelected ? 'bg-primary-500' : 'bg-gray-100'
-                      }`}>
-                        <Icon className={`w-5 h-5 ${
-                          isSelected ? 'text-white' : 'text-gray-600'
-                        }`} />
+                      <div className={`p-2 rounded-lg ${isSelected ? 'bg-primary-500' : 'bg-gray-100'
+                        }`}>
+                        <Icon className={`w-5 h-5 ${isSelected ? 'text-white' : 'text-gray-600'
+                          }`} />
                       </div>
 
                       <div className="flex-1">
@@ -1776,11 +1770,10 @@ const ShopCheckout: React.FC = () => {
             <button
               onClick={handlePayNow}
               disabled={processing}
-              className={`flex-[1.5] py-3.5 text-white rounded-xl font-bold text-base hover:scale-105 active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2 ${
-                calculateTotal() === 0
-                  ? 'bg-gradient-to-r from-green-500 to-emerald-600'
-                  : 'gradient-primary'
-              }`}
+              className={`flex-[1.5] py-3.5 text-white rounded-xl font-bold text-base hover:scale-105 active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2 ${calculateTotal() === 0
+                ? 'bg-gradient-to-r from-green-500 to-emerald-600'
+                : 'gradient-primary'
+                }`}
             >
               <span>
                 {processing
@@ -1856,13 +1849,12 @@ const ShopCheckout: React.FC = () => {
                           }
                         }}
                         disabled={!canUse}
-                        className={`w-full p-4 rounded-xl border-2 text-left transition-all ${
-                          isSelected
-                            ? 'border-orange-500 bg-orange-50'
-                            : canUse
+                        className={`w-full p-4 rounded-xl border-2 text-left transition-all ${isSelected
+                          ? 'border-orange-500 bg-orange-50'
+                          : canUse
                             ? 'border-gray-200 bg-white hover:border-orange-300'
                             : 'border-gray-200 bg-gray-50 opacity-60'
-                        }`}
+                          }`}
                       >
                         <div className="flex items-start gap-3">
                           <div className="p-2 bg-orange-100 rounded-lg flex-shrink-0">
@@ -1976,37 +1968,33 @@ const ShopCheckout: React.FC = () => {
                   {paymentStep === 'creating_order'
                     ? 'Setting up your order details...'
                     : paymentStep === 'redirecting'
-                    ? 'You will be redirected to the payment gateway shortly...'
-                    : 'Please wait while we process your request...'}
+                      ? 'You will be redirected to the payment gateway shortly...'
+                      : 'Please wait while we process your request...'}
                 </p>
               </div>
 
               <div className="glass-light p-4 rounded-2xl space-y-2">
                 <div className="flex items-center gap-3">
-                  <div className={`w-3 h-3 rounded-full ${
-                    paymentStep === 'creating_order' || paymentStep === 'redirecting'
-                      ? 'bg-green-500'
-                      : 'bg-gray-300'
-                  }`}></div>
-                  <span className={`text-sm ${
-                    paymentStep === 'creating_order' || paymentStep === 'redirecting'
-                      ? 'text-gray-900 font-semibold'
-                      : 'text-gray-600'
-                  }`}>Order Created</span>
+                  <div className={`w-3 h-3 rounded-full ${paymentStep === 'creating_order' || paymentStep === 'redirecting'
+                    ? 'bg-green-500'
+                    : 'bg-gray-300'
+                    }`}></div>
+                  <span className={`text-sm ${paymentStep === 'creating_order' || paymentStep === 'redirecting'
+                    ? 'text-gray-900 font-semibold'
+                    : 'text-gray-600'
+                    }`}>Order Created</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <div className={`w-3 h-3 rounded-full ${
-                    paymentStep === 'redirecting'
-                      ? 'bg-green-500 animate-pulse'
-                      : paymentStep === 'creating_order'
+                  <div className={`w-3 h-3 rounded-full ${paymentStep === 'redirecting'
+                    ? 'bg-green-500 animate-pulse'
+                    : paymentStep === 'creating_order'
                       ? 'bg-primary-500 animate-pulse'
                       : 'bg-gray-300'
-                  }`}></div>
-                  <span className={`text-sm ${
-                    paymentStep === 'redirecting'
-                      ? 'text-gray-900 font-semibold'
-                      : 'text-gray-600'
-                  }`}>Redirecting to Payment</span>
+                    }`}></div>
+                  <span className={`text-sm ${paymentStep === 'redirecting'
+                    ? 'text-gray-900 font-semibold'
+                    : 'text-gray-600'
+                    }`}>Redirecting to Payment</span>
                 </div>
               </div>
 

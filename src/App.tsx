@@ -9,7 +9,6 @@ import { ShopProvider } from './contexts/ShopContext';
 import { OfflineProvider } from './contexts/OfflineContext';
 import { ToastProvider } from './contexts/ToastContext';
 import { LanguageProvider } from './contexts/LanguageContext';
-import { WPayDebugProvider } from './contexts/WPayDebugContext';
 import { supabase } from './lib/supabase';
 import { cleanInvalidCookies } from './utils/cookieUtils';
 
@@ -17,8 +16,6 @@ import AppLayout from './components/Layout/AppLayout';
 import AnimatedBackground from './components/Layout/AnimatedBackground';
 import MobileContainer from './components/Layout/MobileContainer';
 import DebugBox from './components/DebugBox';
-import { WPayDebugBox } from './components/WPayDebugBox';
-import { WPayDebugConnector } from './components/WPayDebugConnector';
 import ScrollToTop from './components/ScrollToTop';
 import OfflineOverlay from './components/OfflineOverlay';
 
@@ -208,304 +205,300 @@ function App() {
       <LanguageProvider>
         <ToastProvider>
           <OfflineProvider>
-            <WPayDebugProvider>
-              <ThemeProvider>
-                <AdminAuthProvider>
-                  <StaffAuthProvider>
-                    <KitchenAuthProvider>
-                      <AuthProvider>
-                        <ShopProvider>
-                          <MaintenanceGuard>
-                  <Routes>
-                {/* CMS Routes - Full Width */}
-                <Route path="/cms/*" element={
-                  <div className="theme-gradient-bg min-h-screen transition-all duration-500">
-                    <Routes>
-                      <Route path="login" element={<CMSLogin />} />
-                      <Route path="staff-login" element={<StaffLogin />} />
-                      <Route path="staff-scanner" element={<StaffScanner />} />
-                      <Route path="dashboard" element={<CMSDashboard />} />
-                      <Route path="orders" element={<CMSOrders />} />
-                      <Route path="ai-insights" element={<CMSAIInsights />} />
-                      <Route path="products" element={<CMSProducts />} />
-                      <Route path="categories" element={<CMSCategories />} />
-                      <Route path="modifiers" element={<CMSModifiers />} />
-                      <Route path="customers" element={<CMSCustomers />} />
-                      <Route path="outlets" element={<CMSOutlets />} />
-                      <Route path="staff" element={<CMSStaff />} />
-                      <Route path="redemption-logs" element={<CMSRedemptionLogs />} />
-                      <Route path="star-scanner" element={<CMSStarScanner />} />
-                      <Route path="financial" element={<CMSFinancial />} />
-                      <Route path="wallet-health" element={<CMSWalletHealth />} />
-                      <Route path="rewards" element={<CMSRewards />} />
-                      <Route path="workshops" element={<CMSWorkshops />} />
-                      <Route path="edu-workshops" element={<CMSEduWorkshops />} />
-                      <Route path="marketing" element={<CMSMarketing />} />
-                      <Route path="redemptions" element={<CMSRedemptions />} />
-                      <Route path="promo-sliders" element={<CMSPromoSliders />} />
-                      <Route path="analytics" element={<CMSAnalytics />} />
-                      <Route path="gacha" element={<CMSGacha />} />
-                      <Route path="settings" element={<CMSSettings />} />
-                      <Route path="user-migration" element={<CMSUserMigration />} />
-                      <Route path="unauthorized" element={<CMSUnauthorized />} />
-                      <Route path="*" element={<Navigate to="/cms/dashboard" replace />} />
-                    </Routes>
-                  </div>
-                } />
-
-                {/* KMS Routes - Kitchen Management System */}
-                <Route path="/kms/*" element={
-                  <div className="min-h-screen bg-white">
-                    <Routes>
-                      <Route path="dashboard" element={
-                        <KitchenProtectedRoute>
-                          <KMSKitchen />
-                        </KitchenProtectedRoute>
-                      } />
-                      <Route path="*" element={<Navigate to="/kms/dashboard" replace />} />
-                    </Routes>
-                  </div>
-                } />
-
-                {/* Customer Routes - Mobile Container with Animated Background */}
-                <Route path="*" element={
-                  <>
-                    <AnimatedBackground />
-                    <Routes>
-                      <Route
-                        path="/login"
-                        element={
-                          <PublicRoute>
-                            <Login />
-                          </PublicRoute>
-                        }
-                      />
-                      <Route
-                        path="/"
-                        element={
-                          <PublicRoute>
-                            <Welcome />
-                          </PublicRoute>
-                        }
-                      />
-                      <Route
-                        path="/signup"
-                        element={
-                          <PublicRoute>
-                            <Signup />
-                          </PublicRoute>
-                        }
-                      />
-                      <Route
-                        path="/forgot-password"
-                        element={
-                          <PublicRoute>
-                            <ForgotPassword />
-                          </PublicRoute>
-                        }
-                      />
-
-<Route
-                                  path="/reset-password"
-                                  element={
-                                    <PublicRoute>
-                                      <ResetPassword />
-                                    </PublicRoute>
-                                  }
-                                />
-
-                      
-                      <Route path="*" element={
-                        <MobileContainer>
+            <ThemeProvider>
+              <AdminAuthProvider>
+                <StaffAuthProvider>
+                  <KitchenAuthProvider>
+                    <AuthProvider>
+                      <ShopProvider>
+                        <MaintenanceGuard>
                           <Routes>
-                            <Route
-                              path="/add-child"
-                              element={
-                                <ProtectedRoute>
-                                  <AddChild />
-                                </ProtectedRoute>
-                              }
-                            />
+                            {/* CMS Routes - Full Width */}
+                            <Route path="/cms/*" element={
+                              <div className="theme-gradient-bg min-h-screen transition-all duration-500">
+                                <Routes>
+                                  <Route path="login" element={<CMSLogin />} />
+                                  <Route path="staff-login" element={<StaffLogin />} />
+                                  <Route path="staff-scanner" element={<StaffScanner />} />
+                                  <Route path="dashboard" element={<CMSDashboard />} />
+                                  <Route path="orders" element={<CMSOrders />} />
+                                  <Route path="ai-insights" element={<CMSAIInsights />} />
+                                  <Route path="products" element={<CMSProducts />} />
+                                  <Route path="categories" element={<CMSCategories />} />
+                                  <Route path="modifiers" element={<CMSModifiers />} />
+                                  <Route path="customers" element={<CMSCustomers />} />
+                                  <Route path="outlets" element={<CMSOutlets />} />
+                                  <Route path="staff" element={<CMSStaff />} />
+                                  <Route path="redemption-logs" element={<CMSRedemptionLogs />} />
+                                  <Route path="star-scanner" element={<CMSStarScanner />} />
+                                  <Route path="financial" element={<CMSFinancial />} />
+                                  <Route path="wallet-health" element={<CMSWalletHealth />} />
+                                  <Route path="rewards" element={<CMSRewards />} />
+                                  <Route path="workshops" element={<CMSWorkshops />} />
+                                  <Route path="edu-workshops" element={<CMSEduWorkshops />} />
+                                  <Route path="marketing" element={<CMSMarketing />} />
+                                  <Route path="redemptions" element={<CMSRedemptions />} />
+                                  <Route path="promo-sliders" element={<CMSPromoSliders />} />
+                                  <Route path="analytics" element={<CMSAnalytics />} />
+                                  <Route path="gacha" element={<CMSGacha />} />
+                                  <Route path="settings" element={<CMSSettings />} />
+                                  <Route path="user-migration" element={<CMSUserMigration />} />
+                                  <Route path="unauthorized" element={<CMSUnauthorized />} />
+                                  <Route path="*" element={<Navigate to="/cms/dashboard" replace />} />
+                                </Routes>
+                              </div>
+                            } />
 
-                            <Route
-                              element={
-                                <ProtectedRoute>
-                                  <AppLayout />
-                                </ProtectedRoute>
-                              }
-                            >
-                              <Route path="/home" element={<Home />} />
-                              <Route path="/stars" element={<Stars />} />
-                              <Route path="/edu" element={<EduWorkshops />} />
-                              <Route path="/myqr" element={<MyQR />} />
-                              <Route path="/profile" element={<Profile />} />
-                            </Route>
+                            {/* KMS Routes - Kitchen Management System */}
+                            <Route path="/kms/*" element={
+                              <div className="min-h-screen bg-white">
+                                <Routes>
+                                  <Route path="dashboard" element={
+                                    <KitchenProtectedRoute>
+                                      <KMSKitchen />
+                                    </KitchenProtectedRoute>
+                                  } />
+                                  <Route path="*" element={<Navigate to="/kms/dashboard" replace />} />
+                                </Routes>
+                              </div>
+                            } />
 
-                            <Route
-                              path="/missions"
-                              element={
-                                <ProtectedRoute>
-                                  <Missions />
-                                </ProtectedRoute>
-                              }
-                            />
+                            {/* Customer Routes - Mobile Container with Animated Background */}
+                            <Route path="*" element={
+                              <>
+                                <AnimatedBackground />
+                                <Routes>
+                                  <Route
+                                    path="/login"
+                                    element={
+                                      <PublicRoute>
+                                        <Login />
+                                      </PublicRoute>
+                                    }
+                                  />
+                                  <Route
+                                    path="/"
+                                    element={
+                                      <PublicRoute>
+                                        <Welcome />
+                                      </PublicRoute>
+                                    }
+                                  />
+                                  <Route
+                                    path="/signup"
+                                    element={
+                                      <PublicRoute>
+                                        <Signup />
+                                      </PublicRoute>
+                                    }
+                                  />
+                                  <Route
+                                    path="/forgot-password"
+                                    element={
+                                      <PublicRoute>
+                                        <ForgotPassword />
+                                      </PublicRoute>
+                                    }
+                                  />
 
-                            <Route
-                              path="/wallet"
-                              element={
-                                <ProtectedRoute>
-                                  <Wallet />
-                                </ProtectedRoute>
-                              }
-                            />
-                            <Route
-                              path="/wallet/topup"
-                              element={
-                                <ProtectedRoute>
-                                  <WalletTopup />
-                                </ProtectedRoute>
-                              }
-                            />
-                            <Route
-                              path="/rewards"
-                              element={
-                                <ProtectedRoute>
-                                  <Rewards />
-                                </ProtectedRoute>
-                              }
-                            />
-                            <Route
-                              path="/egg-gacha"
-                              element={
-                                <ProtectedRoute>
-                                  <EggGachaPage />
-                                </ProtectedRoute>
-                              }
-                            />
-                            <Route
-                              path="/share-gacha"
-                              element={
-                                <ProtectedRoute>
-                                  <ShareGachaPage />
-                                </ProtectedRoute>
-                              }
-                            />
-                            <Route
-                              path="/checkin"
-                              element={
-                                <ProtectedRoute>
-                                  <CheckIn />
-                                </ProtectedRoute>
-                              }
-                            />
-                            <Route
-                              path="/workshops"
-                              element={
-                                <ProtectedRoute>
-                                  <Workshops />
-                                </ProtectedRoute>
-                              }
-                            />
-                            <Route
-                              path="/settings"
-                              element={
-                                <ProtectedRoute>
-                                  <Settings />
-                                </ProtectedRoute>
-                              }
-                            />
-                            <Route
-                              path="/shop"
-                              element={
-                                <ProtectedRoute>
-                                  <OutletSelection />
-                                </ProtectedRoute>
-                              }
-                            />
-                            <Route
-                              path="/shop/:outletSlug"
-                              element={
-                                <ProtectedRoute>
-                                  <ShopMenu />
-                                </ProtectedRoute>
-                              }
-                            />
-                            <Route
-                              path="/shop/:outletSlug/product/:productId"
-                              element={
-                                <ProtectedRoute>
-                                  <ProductDetail />
-                                </ProtectedRoute>
-                              }
-                            />
-                            <Route
-                              path="/shop/:outletSlug/cart"
-                              element={
-                                <ProtectedRoute>
-                                  <ShopCart />
-                                </ProtectedRoute>
-                              }
-                            />
-                            <Route
-                              path="/shop/:outletSlug/checkout"
-                              element={
-                                <ProtectedRoute>
-                                  <ShopCheckout />
-                                </ProtectedRoute>
-                              }
-                            />
-                            <Route
-                              path="/shop/:outletSlug/order-success/:orderId"
-                              element={
-                                <ProtectedRoute>
-                                  <OrderSuccess />
-                                </ProtectedRoute>
-                              }
-                            />
-<Route
-                                  path="/payment/callback"
-                                  element={<PaymentCallback />}
-                                />
-                            <Route
-                                  path="/wpay/callback"
-                                  element={<WPayCallback />}
-                                />
+                                  <Route
+                                    path="/reset-password"
+                                    element={
+                                      <PublicRoute>
+                                        <ResetPassword />
+                                      </PublicRoute>
+                                    }
+                                  />
 
 
-                            <Route
-                              path="/myqr"
-                              element={
-                                <ProtectedRoute>
-                                  <PaymentCallback />
-                                </ProtectedRoute>
-                              }
-                            />
+                                  <Route path="*" element={
+                                    <MobileContainer>
+                                      <Routes>
+                                        <Route
+                                          path="/add-child"
+                                          element={
+                                            <ProtectedRoute>
+                                              <AddChild />
+                                            </ProtectedRoute>
+                                          }
+                                        />
 
-                            <Route path="*" element={<Navigate to="/" replace />} />
+                                        <Route
+                                          element={
+                                            <ProtectedRoute>
+                                              <AppLayout />
+                                            </ProtectedRoute>
+                                          }
+                                        >
+                                          <Route path="/home" element={<Home />} />
+                                          <Route path="/stars" element={<Stars />} />
+                                          <Route path="/edu" element={<EduWorkshops />} />
+                                          <Route path="/myqr" element={<MyQR />} />
+                                          <Route path="/profile" element={<Profile />} />
+                                        </Route>
+
+                                        <Route
+                                          path="/missions"
+                                          element={
+                                            <ProtectedRoute>
+                                              <Missions />
+                                            </ProtectedRoute>
+                                          }
+                                        />
+
+                                        <Route
+                                          path="/wallet"
+                                          element={
+                                            <ProtectedRoute>
+                                              <Wallet />
+                                            </ProtectedRoute>
+                                          }
+                                        />
+                                        <Route
+                                          path="/wallet/topup"
+                                          element={
+                                            <ProtectedRoute>
+                                              <WalletTopup />
+                                            </ProtectedRoute>
+                                          }
+                                        />
+                                        <Route
+                                          path="/rewards"
+                                          element={
+                                            <ProtectedRoute>
+                                              <Rewards />
+                                            </ProtectedRoute>
+                                          }
+                                        />
+                                        <Route
+                                          path="/egg-gacha"
+                                          element={
+                                            <ProtectedRoute>
+                                              <EggGachaPage />
+                                            </ProtectedRoute>
+                                          }
+                                        />
+                                        <Route
+                                          path="/share-gacha"
+                                          element={
+                                            <ProtectedRoute>
+                                              <ShareGachaPage />
+                                            </ProtectedRoute>
+                                          }
+                                        />
+                                        <Route
+                                          path="/checkin"
+                                          element={
+                                            <ProtectedRoute>
+                                              <CheckIn />
+                                            </ProtectedRoute>
+                                          }
+                                        />
+                                        <Route
+                                          path="/workshops"
+                                          element={
+                                            <ProtectedRoute>
+                                              <Workshops />
+                                            </ProtectedRoute>
+                                          }
+                                        />
+                                        <Route
+                                          path="/settings"
+                                          element={
+                                            <ProtectedRoute>
+                                              <Settings />
+                                            </ProtectedRoute>
+                                          }
+                                        />
+                                        <Route
+                                          path="/shop"
+                                          element={
+                                            <ProtectedRoute>
+                                              <OutletSelection />
+                                            </ProtectedRoute>
+                                          }
+                                        />
+                                        <Route
+                                          path="/shop/:outletSlug"
+                                          element={
+                                            <ProtectedRoute>
+                                              <ShopMenu />
+                                            </ProtectedRoute>
+                                          }
+                                        />
+                                        <Route
+                                          path="/shop/:outletSlug/product/:productId"
+                                          element={
+                                            <ProtectedRoute>
+                                              <ProductDetail />
+                                            </ProtectedRoute>
+                                          }
+                                        />
+                                        <Route
+                                          path="/shop/:outletSlug/cart"
+                                          element={
+                                            <ProtectedRoute>
+                                              <ShopCart />
+                                            </ProtectedRoute>
+                                          }
+                                        />
+                                        <Route
+                                          path="/shop/:outletSlug/checkout"
+                                          element={
+                                            <ProtectedRoute>
+                                              <ShopCheckout />
+                                            </ProtectedRoute>
+                                          }
+                                        />
+                                        <Route
+                                          path="/shop/:outletSlug/order-success/:orderId"
+                                          element={
+                                            <ProtectedRoute>
+                                              <OrderSuccess />
+                                            </ProtectedRoute>
+                                          }
+                                        />
+                                        <Route
+                                          path="/payment/callback"
+                                          element={<PaymentCallback />}
+                                        />
+                                        <Route
+                                          path="/wpay/callback"
+                                          element={<WPayCallback />}
+                                        />
+
+
+                                        <Route
+                                          path="/myqr"
+                                          element={
+                                            <ProtectedRoute>
+                                              <PaymentCallback />
+                                            </ProtectedRoute>
+                                          }
+                                        />
+
+                                        <Route path="*" element={<Navigate to="/" replace />} />
+                                      </Routes>
+                                    </MobileContainer>
+                                  } />
+                                </Routes>
+                              </>
+                            } />
                           </Routes>
-                        </MobileContainer>
-                      } />
-                    </Routes>
-                  </>
-                } />
-              </Routes>
-                  </MaintenanceGuard>
-                  <WPayDebugConnector />
-                  <DebugBox />
-                  <WPayDebugBox />
-              </ShopProvider>
-            </AuthProvider>
-          </KitchenAuthProvider>
-          </StaffAuthProvider>
-        </AdminAuthProvider>
-      </ThemeProvider>
-      <OfflineOverlay />
-    </WPayDebugProvider>
-    </OfflineProvider>
-    </ToastProvider>
-    </LanguageProvider>
-  </BrowserRouter>
-);
+                        </MaintenanceGuard>
+                        <DebugBox />
+                      </ShopProvider>
+                    </AuthProvider>
+                  </KitchenAuthProvider>
+                </StaffAuthProvider>
+              </AdminAuthProvider>
+            </ThemeProvider>
+            <OfflineOverlay />
+          </OfflineProvider>
+        </ToastProvider>
+      </LanguageProvider>
+    </BrowserRouter>
+  );
 }
 
 export default App;

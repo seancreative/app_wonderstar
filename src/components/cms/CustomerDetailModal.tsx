@@ -58,7 +58,8 @@ const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({ customer, onC
   const [syncingBalances, setSyncingBalances] = React.useState(false);
 
   const { balances, loading: loadingBalances, refresh: refreshBalances } = useMasterBalances({
-    userId: customer.id
+    userId: customer.id,
+    userEmail: customer.email
   });
 
   React.useEffect(() => {
@@ -149,8 +150,8 @@ const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({ customer, onC
           category: 'transaction',
           icon: isPositive ? 'ArrowUpCircle' : 'ArrowDownCircle',
           title: tx.transaction_type === 'topup' ? 'Wallet Top-up' :
-                 tx.transaction_type === 'spend' ? 'Wallet Payment' :
-                 tx.transaction_type === 'refund' ? 'Wallet Refund' : 'Bonus',
+            tx.transaction_type === 'spend' ? 'Wallet Payment' :
+              tx.transaction_type === 'refund' ? 'Wallet Refund' : 'Bonus',
           description: tx.description || `${tx.transaction_type} transaction`,
           amount: isPositive ? parseFloat(tx.amount.toString()) : -Math.abs(parseFloat(tx.amount.toString())),
           bonus: tx.bonus_amount ? parseFloat(tx.bonus_amount.toString()) : 0,
@@ -657,9 +658,8 @@ const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({ customer, onC
                                 <p className="font-black text-gray-900 text-lg">{child.name}</p>
                                 <div className="flex items-center gap-2 mt-1 flex-wrap">
                                   {child.gender && (
-                                    <span className={`text-xs px-2 py-1 rounded-full font-bold ${
-                                      child.gender === 'male' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'
-                                    }`}>
+                                    <span className={`text-xs px-2 py-1 rounded-full font-bold ${child.gender === 'male' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'
+                                      }`}>
                                       {child.gender === 'male' ? '👦 Male' : '👧 Female'}
                                     </span>
                                   )}
@@ -768,16 +768,14 @@ const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({ customer, onC
                           </div>
                           <div className="text-right flex-shrink-0">
                             {activity.stars && activity.stars !== 0 && (
-                              <p className={`text-sm font-bold whitespace-nowrap ${
-                                activity.stars > 0 ? 'text-yellow-600' : 'text-red-600'
-                              }`}>
+                              <p className={`text-sm font-bold whitespace-nowrap ${activity.stars > 0 ? 'text-yellow-600' : 'text-red-600'
+                                }`}>
                                 {activity.stars > 0 ? '+' : ''}{activity.stars} ⭐
                               </p>
                             )}
                             {activity.amount && activity.amount !== 0 && (
-                              <p className={`text-sm font-bold whitespace-nowrap ${
-                                activity.amount > 0 ? 'text-green-600' : 'text-red-600'
-                              }`}>
+                              <p className={`text-sm font-bold whitespace-nowrap ${activity.amount > 0 ? 'text-green-600' : 'text-red-600'
+                                }`}>
                                 {activity.amount > 0 ? '+' : ''}RM {Math.abs(activity.amount).toFixed(2)}
                               </p>
                             )}
@@ -847,12 +845,11 @@ const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({ customer, onC
                           </p>
                           <p className="text-xs text-gray-600 font-mono">{formatDateTimeCMS(order.created_at)}</p>
                         </div>
-                        <span className={`text-xs px-2 py-1 rounded-full font-bold ${
-                          order.status === 'completed' ? 'bg-green-100 text-green-700' :
-                          order.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                          order.status === 'cancelled' ? 'bg-red-100 text-red-700' :
-                          'bg-gray-100 text-gray-700'
-                        }`}>
+                        <span className={`text-xs px-2 py-1 rounded-full font-bold ${order.status === 'completed' ? 'bg-green-100 text-green-700' :
+                            order.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                              order.status === 'cancelled' ? 'bg-red-100 text-red-700' :
+                                'bg-gray-100 text-gray-700'
+                          }`}>
                           {order.status}
                         </span>
                       </div>
@@ -880,9 +877,8 @@ const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({ customer, onC
                         <p className="text-sm font-bold text-gray-900">
                           {redemption.stamps_used} stamps used
                         </p>
-                        <span className={`text-xs px-2 py-1 rounded-full font-bold ${
-                          redemption.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-                        }`}>
+                        <span className={`text-xs px-2 py-1 rounded-full font-bold ${redemption.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                          }`}>
                           {redemption.status}
                         </span>
                       </div>

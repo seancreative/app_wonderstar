@@ -1,15 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { calculateMasterBalances, MasterBalances } from '../services/masterBalanceCalculator';
-import { wpayService } from '../services/wpayService';
+import { wpayService, WPayProfile } from '../services/wpayService';
 
 interface UseMasterBalancesOptions {
   userId: string | null;
-  userEmail?: string | null;
+  userEmail?: string | null; // Add email for WPay lookup
   dateFilter?: string;
   autoRefresh?: boolean;
   refreshInterval?: number;
-  useWPayAPI?: boolean;
 }
 
 interface UseMasterBalancesReturn {
@@ -17,7 +16,6 @@ interface UseMasterBalancesReturn {
   loading: boolean;
   error: Error | null;
   refresh: () => Promise<void>;
-  source: 'wpay' | 'supabase' | null;
 }
 
 export function useMasterBalances({
@@ -25,13 +23,11 @@ export function useMasterBalances({
   userEmail,
   dateFilter,
   autoRefresh = false,
-  refreshInterval = 30000,
-  useWPayAPI = true
+  refreshInterval = 30000
 }: UseMasterBalancesOptions): UseMasterBalancesReturn {
   const [balances, setBalances] = useState<MasterBalances | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const [source, setSource] = useState<'wpay' | 'supabase' | null>(null);
 
   const loadBalances = useCallback(async () => {
     console.log('[useMasterBalances] loadBalances called with userId:', userId, 'email:', userEmail);
@@ -40,7 +36,6 @@ export function useMasterBalances({
       console.log('[useMasterBalances] No userId provided, setting balances to null');
       setBalances(null);
       setLoading(false);
-      setSource(null);
       return;
     }
 
@@ -48,23 +43,24 @@ export function useMasterBalances({
       setLoading(true);
       setError(null);
 
-      // Try WPay API first if enabled and email is available
-      if (useWPayAPI && userEmail) {
+      // ========== TRY WPAY FIRST (for most accurate real-time data) ==========
+      if (userEmail) {
         try {
-          console.log('[useMasterBalances] Fetching from WPay API for email:', userEmail);
-          const profileResponse = await wpayService.getProfile(userEmail);
+          console.log('[useMasterBalances] Fetching from WPay for email:', userEmail);
+          const response = await wpayService.getProfile(userEmail);
 
-          if (profileResponse.success && profileResponse.data) {
-            console.log('[useMasterBalances] WPay API response:', profileResponse.data);
+          if (response && response.wpay_status === 'success' && response.profile) {
+            const wpayProfile = response.profile;
+            console.log('[useMasterBalances] Got WPay profile:', wpayProfile);
 
-            // Convert WPay response to MasterBalances format
+            // Create balances object from WPay data
             const wpayBalances: MasterBalances = {
-              wBalance: profileResponse.data.wbalance,
-              bonusBalance: profileResponse.data.bonus,
-              starsBalance: profileResponse.data.stars,
-              lifetimeTopup: profileResponse.data.lifetime_topups,
-              totalTransactions: 0, // Not provided by WPay API
-              transactionHistory: [], // Not provided by WPay API
+              totalTransactions: 0, // WPay doesn't provide this
+              lifetimeTopup: wpayProfile.lifetime_topups || 0,
+              wBalance: wpayProfile.wbalance || 0,
+              bonusBalance: wpayProfile.bonus || 0,
+              starsBalance: wpayProfile.stars || 0,
+              transactionHistory: [], // WPay doesn't provide detailed history
               calculatedAt: new Date().toISOString()
             };
 
@@ -75,17 +71,16 @@ export function useMasterBalances({
             });
 
             setBalances(wpayBalances);
-            setSource('wpay');
             setLoading(false);
             return;
           }
         } catch (wpayError) {
-          console.warn('[useMasterBalances] WPay API failed, falling back to Supabase:', wpayError);
+          console.log('[useMasterBalances] WPay fetch failed, falling back to Supabase:', wpayError);
           // Fall through to Supabase calculation
         }
       }
 
-      // Fallback to Supabase transaction calculation
+      // ========== FALLBACK TO SUPABASE ==========
       console.log('[useMasterBalances] Calling calculateMasterBalances with userId:', userId);
       const result = await calculateMasterBalances(userId, dateFilter);
       console.log('[useMasterBalances] Received Supabase balances:', {
@@ -94,15 +89,13 @@ export function useMasterBalances({
         stars: result.starsBalance
       });
       setBalances(result);
-      setSource('supabase');
     } catch (err) {
-      console.error('[useMasterBalances] Error loading balances:', err);
+      console.error('[useMasterBalances] Error calculating master balances:', err);
       setError(err instanceof Error ? err : new Error('Unknown error'));
-      setSource(null);
     } finally {
       setLoading(false);
     }
-  }, [userId, userEmail, dateFilter, useWPayAPI]);
+  }, [userId, userEmail, dateFilter]);
 
   useEffect(() => {
     loadBalances();
@@ -227,7 +220,6 @@ export function useMasterBalances({
     balances,
     loading,
     error,
-    refresh: loadBalances,
-    source
+    refresh: loadBalances
   };
 }

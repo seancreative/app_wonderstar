@@ -12,18 +12,6 @@ import { useStamps } from '../hooks/useStamps';
 import confetti from 'canvas-confetti';
 import QRCodeDisplay from '../components/QRCodeDisplay';
 
-/**
- * Payment Callback Handler
- *
- * ⚠️⚠️⚠️ ALL VERIFICATION CHECKS TEMPORARILY DISABLED ⚠️⚠️⚠️
- *
- * ALL transactions (topup AND shop orders) will succeed without verification:
- * - Direct status updates without atomic functions or retry logic
- * - No complex verification or validation loops
- * - Still handles: bonuses, stars, stamps, QR codes, redemptions, cart clearing
- *
- * This is a TEMPORARY measure! Should be re-enabled for production!
- */
 const PaymentCallback: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -272,12 +260,12 @@ const PaymentCallback: React.FC = () => {
 
   const handleSuccessfulPayment = async (paymentTx: any) => {
     try {
-      console.log('[Payment Success] 🚨 VERIFICATION DISABLED - Processing payment (simplified)');
-      console.log('[Payment Success] ⚠️ All verification checks bypassed temporarily');
+      // NOTE: payment_transactions table is in Laravel's database, not Supabase
+      // The Laravel backend already updates it via the webhook callback
+      console.log('[Payment Success] Processing successful payment');
 
-      // WALLET TOPUP PROCESSING (SIMPLIFIED)
       if (paymentTx.wallet_transaction_id) {
-        console.log('[Payment Success] 💰 Processing wallet topup (simplified - no verification)');
+        console.log('[Payment Success] Processing wallet topup');
 
         const { data: walletTx, error: walletFetchError } = await supabase
           .from('wallet_transactions')
@@ -290,81 +278,32 @@ const PaymentCallback: React.FC = () => {
           return;
         }
 
-        // Check if already processed - but still award missing stars/bonus
+        // CRITICAL: Check if this transaction has already been processed
         if (walletTx.status === 'success') {
-          console.log('[Payment Success] ⚠️ Transaction already processed - checking if stars/bonus need recovery...');
+          console.log('[Payment Success] Transaction already processed, checking if bonus was awarded...');
 
+          // FIX: Check if bonus still needs to be awarded
           const metadata = walletTx.metadata || paymentTx.metadata || {};
           const bonusAmount = metadata.bonus_amount || 0;
-          const packageId = metadata.package_id;
-          const baseStars = metadata.base_stars || 0;
-          const extraStars = metadata.extra_stars || 0;
-          const starsToAward = baseStars + extraStars;
 
-          // Check and award STARS if missing
-          if (starsToAward > 0) {
-            console.log('[Payment Success] 🌟 Checking if stars were awarded...');
-
-            const { data: existingStars } = await supabase
-              .from('stars_transactions')
-              .select('id')
-              .eq('user_id', paymentTx.user_id)
-              .eq('source', 'wallet_topup')
-              .eq('metadata->>payment_transaction_id', paymentTx.order_id)
-              .maybeSingle();
-
-            if (!existingStars) {
-              console.log('[Payment Success] ⚠️ Stars NOT found, awarding now...', starsToAward);
-
-              try {
-                const { data: starsData, error: starsError } = await supabase
-                  .from('stars_transactions')
-                  .insert({
-                    user_id: paymentTx.user_id,
-                    transaction_type: 'earn',
-                    amount: starsToAward,
-                    source: 'wallet_topup',
-                    metadata: {
-                      topup_amount: walletTx.amount,
-                      payment_transaction_id: paymentTx.order_id,
-                      wallet_transaction_id: walletTx.id,
-                      package_id: packageId,
-                      base_stars: baseStars,
-                      extra_stars: extraStars,
-                      recovered_from_skip: true
-                    }
-                  })
-                  .select();
-
-                if (starsError) {
-                  console.error('[Payment Success] ❌ Failed to award stars:', starsError);
-                } else {
-                  console.log('[Payment Success] ✅ Stars awarded successfully:', starsData);
-                }
-              } catch (err) {
-                console.error('[Payment Success] ❌ Exception awarding stars:', err);
-              }
-            } else {
-              console.log('[Payment Success] ✅ Stars already awarded');
-            }
-          }
-
-          // Check and award BONUS if missing
           if (bonusAmount > 0) {
-            console.log('[Payment Success] 💰 Checking if bonus was awarded...');
+            console.log('[Payment Success] Checking if bonus was awarded for this topup...');
 
+            // Check if bonus_transaction exists for this wallet transaction
             const { data: existingBonus } = await supabase
               .from('bonus_transactions')
               .select('id')
               .eq('user_id', paymentTx.user_id)
               .eq('transaction_type', 'topup_bonus')
-              .eq('metadata->>payment_transaction_id', paymentTx.order_id)
+              .eq('metadata->>wallet_transaction_id', walletTx.id)
               .maybeSingle();
 
             if (!existingBonus) {
-              console.log('[Payment Success] ⚠️ Bonus NOT found, awarding now...', bonusAmount);
+              console.log('[Payment Success] ⚠️ Bonus NOT found, awarding now...');
 
               try {
+                // Use atomic function to update bonus balance safely
+                // This prevents race conditions and ensures balance_after is always correct
                 const { data: result, error: atomicError } = await supabase
                   .rpc('update_bonus_balance_atomic', {
                     p_user_id: paymentTx.user_id,
@@ -376,7 +315,7 @@ const PaymentCallback: React.FC = () => {
                     p_metadata: {
                       payment_transaction_id: paymentTx.order_id,
                       wallet_transaction_id: walletTx.id,
-                      package_id: packageId,
+                      package_id: metadata.package_id,
                       topup_amount: walletTx.amount,
                       completed_at: new Date().toISOString(),
                       recovered_from_skip: true
@@ -384,21 +323,21 @@ const PaymentCallback: React.FC = () => {
                   });
 
                 if (atomicError) {
-                  console.error('[Payment Success] ❌ Failed to award bonus:', atomicError);
+                  console.error('[Payment Success] Failed to award bonus atomically:', atomicError);
                 } else if (result && result.length > 0) {
                   const atomicResult = result[0];
                   if (atomicResult.success) {
-                    console.log('[Payment Success] ✅ Bonus awarded successfully:', {
+                    console.log('[Payment Success] ✅ Bonus awarded successfully via atomic function:', {
                       transaction_id: atomicResult.transaction_id,
                       new_balance: atomicResult.new_balance,
                       amount: bonusAmount
                     });
                   } else {
-                    console.error('[Payment Success] ❌ Bonus update failed:', atomicResult.message);
+                    console.error('[Payment Success] Atomic bonus update failed:', atomicResult.message);
                   }
                 }
               } catch (bonusError) {
-                console.error('[Payment Success] ❌ Exception awarding bonus:', bonusError);
+                console.error('[Payment Success] Error awarding bonus:', bonusError);
               }
             } else {
               console.log('[Payment Success] ✅ Bonus already awarded');
@@ -409,9 +348,9 @@ const PaymentCallback: React.FC = () => {
           setMessage('Payment already processed successfully!');
           setPaymentDetails(paymentTx);
 
-          // Reload balances
+          // IMPORTANT: Reload balances even when already processed so user sees current balance
           if (user) {
-            console.log('[Payment Success] Reloading balances...');
+            console.log('[Payment Success] Reloading balances for already-processed transaction...');
             await new Promise(resolve => setTimeout(resolve, 500));
             await reloadBalance();
             await refreshStars();
@@ -422,28 +361,57 @@ const PaymentCallback: React.FC = () => {
           return;
         }
 
-        // SIMPLE DIRECT UPDATE - NO VERIFICATION
-        console.log('[Payment Success] 🚨 Updating wallet transaction directly (no retry/verification)');
-        const { error: updateError } = await supabase
-          .from('wallet_transactions')
-          .update({
-            status: 'success',
-            metadata: {
-              ...walletTx.metadata,
-              completed_at: new Date().toISOString(),
-              payment_transaction_id: paymentTx.order_id,
-              callback_processed_at: new Date().toISOString(),
-              simplified_flow: true
-            }
-          } as any)
-          .eq('id', paymentTx.wallet_transaction_id);
+        // Use atomic status update function with retry logic
+        console.log('[Payment Success] Calling atomic status update function with retry...');
+        const updateResult = await updateWalletTransactionStatus(
+          paymentTx.wallet_transaction_id,
+          'success',
+          'payment_callback',
+          {
+            completed_at: new Date().toISOString(),
+            payment_transaction_id: paymentTx.order_id,
+            payment_order_id: paymentTx.order_id,
+            fiuu_transaction_id: paymentTx.fiuu_transaction_id,
+            payment_amount: paymentTx.amount,
+            callback_timestamp: new Date().toISOString()
+          },
+          {
+            maxAttempts: 5,
+            initialDelayMs: 300,
+            maxDelayMs: 3000
+          }
+        );
 
-        if (updateError) {
-          console.error('[Payment Success] ❌ Failed to update wallet transaction:', updateError);
-          throw updateError;
+        if (!updateResult.success) {
+          console.error('[Payment Success] ❌ CRITICAL: Failed to update wallet transaction status after all retries');
+          console.error('[Payment Success] Update result:', updateResult);
+          throw new Error(`Failed to credit wallet balance: ${updateResult.error_message || updateResult.error || 'Unknown error'}`);
         }
 
-        console.log('[Payment Success] ✅ Wallet transaction marked as success (simple update)');
+        console.log('[Payment Success] ✅ Wallet transaction marked as success:', {
+          old_status: updateResult.old_status,
+          new_status: updateResult.new_status,
+          idempotent: updateResult.idempotent,
+          audit_id: updateResult.audit_id,
+          attempts: updateResult.attempt
+        });
+
+        // Verify the update with our verification function
+        const verification = await verifyWalletTransactionStatus(
+          paymentTx.wallet_transaction_id,
+          'success'
+        );
+
+        if (!verification.verified) {
+          console.error('[Payment Success] ⚠️ WARNING: Status verification failed!', {
+            expected: 'success',
+            actual: verification.actualStatus,
+            transaction: verification.transaction
+          });
+          // Don't throw - the atomic function logged success, verification might be timing issue
+        } else {
+          console.log('[Payment Success] ✅ Status verified successfully');
+        }
 
         // Update user's lifetime_topups for tier calculation
         console.log('[Payment Success] Updating lifetime_topups for tier system');
@@ -498,63 +466,49 @@ const PaymentCallback: React.FC = () => {
         });
 
         if (starsToAward > 0 && paymentTx.user_id) {
-          console.log('[Payment Success] 🌟 Checking for existing stars before awarding...');
+          try {
+            console.log('[Payment Success] 🌟 INSERTING STARS TRANSACTION:', {
+              user_id: paymentTx.user_id,
+              amount: starsToAward,
+              source: 'wallet_topup',
+              wallet_transaction_id: walletTx.id
+            });
 
-          // Check if stars already awarded using payment_transaction_id (unique identifier)
-          const { data: existingStars } = await supabase
-            .from('stars_transactions')
-            .select('id')
-            .eq('user_id', paymentTx.user_id)
-            .eq('source', 'wallet_topup')
-            .eq('metadata->>payment_transaction_id', paymentTx.order_id)
-            .maybeSingle();
-
-          if (existingStars) {
-            console.log('[Payment Success] ⚠️ Stars already awarded for this payment, skipping to prevent duplicate');
-          } else {
-            try {
-              console.log('[Payment Success] 🌟 INSERTING STARS TRANSACTION:', {
+            // Award stars directly to ensure it works even if user is not logged in
+            const { data: starsData, error: starsError } = await supabase
+              .from('stars_transactions')
+              .insert({
                 user_id: paymentTx.user_id,
+                transaction_type: 'earn',
                 amount: starsToAward,
                 source: 'wallet_topup',
-                payment_transaction_id: paymentTx.order_id
+                metadata: {
+                  topup_amount: walletTx.amount,
+                  payment_transaction_id: paymentTx.order_id,
+                  wallet_transaction_id: walletTx.id,
+                  package_id: packageId,
+                  base_stars: baseStars,
+                  extra_stars: extraStars
+                }
+              })
+              .select();
+
+            if (starsError) {
+              console.error('[Payment Success] ❌ FAILED to award stars:', {
+                error: starsError,
+                code: starsError.code,
+                message: starsError.message,
+                details: starsError.details,
+                hint: starsError.hint
               });
-
-              const { data: starsData, error: starsError } = await supabase
-                .from('stars_transactions')
-                .insert({
-                  user_id: paymentTx.user_id,
-                  transaction_type: 'earn',
-                  amount: starsToAward,
-                  source: 'wallet_topup',
-                  metadata: {
-                    topup_amount: walletTx.amount,
-                    payment_transaction_id: paymentTx.order_id,
-                    wallet_transaction_id: walletTx.id,
-                    package_id: packageId,
-                    base_stars: baseStars,
-                    extra_stars: extraStars
-                  }
-                })
-                .select();
-
-              if (starsError) {
-                console.error('[Payment Success] ❌ FAILED to award stars:', {
-                  error: starsError,
-                  code: starsError.code,
-                  message: starsError.message,
-                  details: starsError.details,
-                  hint: starsError.hint
-                });
-              } else {
-                console.log('[Payment Success] ✅ STARS AWARDED SUCCESSFULLY:', {
-                  amount: starsToAward,
-                  insertedRecord: starsData
-                });
-              }
-            } catch (starsError) {
-              console.error('[Payment Success] ❌ EXCEPTION awarding stars:', starsError);
+            } else {
+              console.log('[Payment Success] ✅ STARS AWARDED SUCCESSFULLY:', {
+                amount: starsToAward,
+                insertedRecord: starsData
+              });
             }
+          } catch (starsError) {
+            console.error('[Payment Success] ❌ EXCEPTION awarding stars:', starsError);
           }
         } else {
           console.log('[Payment Success] ⚠️ SKIPPING stars award:', {
@@ -566,77 +520,81 @@ const PaymentCallback: React.FC = () => {
 
         // Award Bonus Balance from package configuration
         if (bonusAmount > 0) {
-          console.log('[Payment Success] 💰 Checking for existing bonus before awarding...');
+          console.log('[Payment Success] 💰 AWARDING BONUS BALANCE from package:', {
+            bonusAmount,
+            userId: paymentTx.user_id,
+            walletTransactionId: walletTx.id
+          });
 
-          // Check if bonus already awarded using payment_transaction_id (unique identifier)
-          const { data: existingBonus } = await supabase
-            .from('bonus_transactions')
-            .select('id')
-            .eq('user_id', paymentTx.user_id)
-            .eq('transaction_type', 'topup_bonus')
-            .eq('metadata->>payment_transaction_id', paymentTx.order_id)
-            .maybeSingle();
-
-          if (existingBonus) {
-            console.log('[Payment Success] ⚠️ Bonus already awarded for this payment, skipping to prevent duplicate');
-          } else {
-            console.log('[Payment Success] 💰 AWARDING BONUS BALANCE from package:', {
-              bonusAmount,
-              userId: paymentTx.user_id,
-              payment_transaction_id: paymentTx.order_id
+          try {
+            // Use atomic function to update bonus balance safely
+            // This prevents race conditions and ensures balance_after is always correct
+            console.log('[Payment Success] 💰 CALLING update_bonus_balance_atomic RPC function with params:', {
+              p_user_id: paymentTx.user_id,
+              p_amount: bonusAmount,
+              p_transaction_type: 'topup_bonus',
+              p_description: `Bonus from wallet top-up: RM${walletTx.amount.toFixed(2)}`,
+              p_order_id: paymentTx.shop_order_id || null,
+              p_order_number: paymentTx.order_id,
+              p_metadata: {
+                payment_transaction_id: paymentTx.order_id,
+                wallet_transaction_id: walletTx.id,
+                package_id: packageId,
+                topup_amount: walletTx.amount,
+                completed_at: new Date().toISOString()
+              }
             });
 
-            try {
-              console.log('[Payment Success] 💰 CALLING update_bonus_balance_atomic RPC function');
-
-              const { data: result, error: atomicError } = await supabase
-                .rpc('update_bonus_balance_atomic', {
-                  p_user_id: paymentTx.user_id,
-                  p_amount: bonusAmount,
-                  p_transaction_type: 'topup_bonus',
-                  p_description: `Bonus from wallet top-up: RM${walletTx.amount.toFixed(2)}`,
-                  p_order_id: paymentTx.shop_order_id || null,
-                  p_order_number: paymentTx.order_id,
-                  p_metadata: {
-                    payment_transaction_id: paymentTx.order_id,
-                    wallet_transaction_id: walletTx.id,
-                    package_id: packageId,
-                    topup_amount: walletTx.amount,
-                    completed_at: new Date().toISOString()
-                  }
-                });
-
-              if (atomicError) {
-                // Check if error is due to duplicate constraint
-                if (atomicError.code === '23505') {
-                  console.log('[Payment Success] ⚠️ Bonus already awarded (duplicate prevented by database constraint)');
-                } else {
-                  console.error('[Payment Success] ❌ FAILED to award bonus atomically:', {
-                    error: atomicError,
-                    code: atomicError.code,
-                    message: atomicError.message,
-                    details: atomicError.details,
-                    hint: atomicError.hint
-                  });
+            const { data: result, error: atomicError } = await supabase
+              .rpc('update_bonus_balance_atomic', {
+                p_user_id: paymentTx.user_id,
+                p_amount: bonusAmount,
+                p_transaction_type: 'topup_bonus',
+                p_description: `Bonus from wallet top-up: RM${walletTx.amount.toFixed(2)}`,
+                p_order_id: paymentTx.shop_order_id || null,
+                p_order_number: paymentTx.order_id,
+                p_metadata: {
+                  payment_transaction_id: paymentTx.order_id,
+                  wallet_transaction_id: walletTx.id,
+                  package_id: packageId,
+                  topup_amount: walletTx.amount,
+                  completed_at: new Date().toISOString()
                 }
-              } else if (result && result.length > 0) {
-                const atomicResult = result[0];
-                console.log('[Payment Success] 💰 RPC RESULT:', atomicResult);
-                if (atomicResult.success) {
-                  console.log('[Payment Success] ✅ BONUS AWARDED SUCCESSFULLY via atomic function:', {
-                    transaction_id: atomicResult.transaction_id,
-                    new_balance: atomicResult.new_balance,
-                    amount: bonusAmount
-                  });
-                } else {
-                  console.error('[Payment Success] ❌ Atomic bonus update returned success=false:', atomicResult.message);
-                }
+              });
+
+            if (atomicError) {
+              // Check if error is due to duplicate constraint
+              if (atomicError.code === '23505') {
+                console.log('[Payment Success] ⚠️ Bonus already awarded (duplicate prevented by database constraint)');
               } else {
-                console.error('[Payment Success] ❌ RPC returned no result:', { result, atomicError });
+                console.error('[Payment Success] ❌ FAILED to award bonus atomically:', {
+                  error: atomicError,
+                  code: atomicError.code,
+                  message: atomicError.message,
+                  details: atomicError.details,
+                  hint: atomicError.hint
+                });
+                throw atomicError;
               }
-            } catch (bonusError) {
-              console.error('[Payment Success] ❌ EXCEPTION awarding bonus:', bonusError);
+            } else if (result && result.length > 0) {
+              const atomicResult = result[0];
+              console.log('[Payment Success] 💰 RPC RESULT:', atomicResult);
+              if (atomicResult.success) {
+                console.log('[Payment Success] ✅ BONUS AWARDED SUCCESSFULLY via atomic function:', {
+                  transaction_id: atomicResult.transaction_id,
+                  new_balance: atomicResult.new_balance,
+                  amount: bonusAmount,
+                  fullResult: atomicResult
+                });
+              } else {
+                console.error('[Payment Success] ❌ Atomic bonus update returned success=false:', atomicResult.message);
+                throw new Error(atomicResult.message);
+              }
+            } else {
+              console.error('[Payment Success] ❌ RPC returned no result:', { result, atomicError });
             }
+          } catch (bonusError) {
+            console.error('[Payment Success] ❌ EXCEPTION awarding bonus:', bonusError);
           }
         } else {
           console.log('[Payment Success] ⚠️ SKIPPING bonus award:', {
@@ -755,28 +713,33 @@ const PaymentCallback: React.FC = () => {
       }
 
       if (paymentTx.shop_order_id) {
-        console.log('[Payment Success] 🛒 Processing shop order (simplified - no verification)');
+        console.log('[Payment Success] Processing shop order');
 
-        // Get existing order
+        // Check if order already has QR code (webhook might have generated it)
         const { data: existingOrder } = await supabase
           .from('shop_orders')
           .select('qr_code, status, payment_status')
           .eq('id', paymentTx.shop_order_id)
           .maybeSingle();
 
-        // Skip if already processed
+        // CRITICAL: Check if this order has already been processed
         if (existingOrder?.payment_status === 'paid' && existingOrder?.qr_code) {
-          console.log('[Payment Success] ✅ Order already processed');
+          console.log('[Payment Success] Order already processed, skipping to prevent duplicates');
           setOrderDetails(existingOrder);
           return;
         }
 
-        // Generate QR code
-        let qrCode = existingOrder?.qr_code || `WP-${paymentTx.shop_order_id}-${Date.now()}`;
-        console.log('[Payment Success] QR code:', qrCode);
+        let qrCode = existingOrder?.qr_code;
 
-        // Simple direct update - no verification
-        console.log('[Payment Success] 🚨 Updating shop order directly (no verification)');
+        // Generate QR code only if it doesn't exist
+        if (!qrCode) {
+          qrCode = `WP-${paymentTx.shop_order_id}-${Date.now()}`;
+          console.log('[Payment Success] Generating QR code:', qrCode);
+        } else {
+          console.log('[Payment Success] QR code already exists:', qrCode);
+        }
+
+        // Always update the order to ensure status and payment_status are correct
         const { error: updateError } = await supabase
           .from('shop_orders')
           .update({
@@ -788,11 +751,10 @@ const PaymentCallback: React.FC = () => {
           .eq('id', paymentTx.shop_order_id);
 
         if (updateError) {
-          console.error('[Payment Success] ❌ Failed to update shop order:', updateError);
-          throw updateError;
+          console.error('[Payment Success] Failed to update shop order:', updateError);
+        } else {
+          console.log('[Payment Success] Shop order updated successfully');
         }
-
-        console.log('[Payment Success] ✅ Shop order marked as paid (simple update)');
 
         const { data: orderData } = await supabase
           .from('shop_orders')
