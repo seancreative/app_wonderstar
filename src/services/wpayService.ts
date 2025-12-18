@@ -1,25 +1,28 @@
 /**
- * WPay Service
+ * WPay Service - Fixed for CORS issues
  * 
- * Handles all communication with the WPay API for:
- * - Processing payments (online, wbalance, free)
- * - Getting user profiles
- * - Transaction management
- * - Tier information
+ * Avoids triggering CORS preflight by:
+ * 1. Using simple requests (GET with no custom headers)
+ * 2. Removing Content-Type from GET requests
  */
 
 import { API_BASE_URL } from '../config/api';
 
 const WPAY_BASE_URL = API_BASE_URL;
 
+// Simple headers that don't trigger preflight
+const SIMPLE_HEADERS = {
+    'Accept': 'application/json',
+};
+
+// Full headers for POST (will trigger preflight, but needed)
 const WPAY_HEADERS = {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
-    'ngrok-skip-browser-warning': 'true',
 };
 
 // ============================================
-// Types
+// Types (unchanged)
 // ============================================
 
 export type TierType = 'bronze' | 'silver' | 'gold' | 'platinum' | 'vip';
@@ -128,10 +131,18 @@ class WPayService {
 
         try {
             const url = `${WPAY_BASE_URL}${endpoint}`;
+            
+            // Use simple headers for GET to avoid preflight
+            const headers = method === 'GET' ? SIMPLE_HEADERS : WPAY_HEADERS;
+            
             const options: RequestInit = {
                 method,
-                headers: WPAY_HEADERS,
+                headers,
                 signal: controller.signal,
+                // Important: use 'cors' mode explicitly
+                mode: 'cors',
+                // Don't send credentials to avoid preflight
+                credentials: 'omit',
             };
 
             if (body && method === 'POST') {
@@ -162,15 +173,17 @@ class WPayService {
                 throw new Error('Request timeout. Please check your connection.');
             }
 
+            // Better error message for CORS
+            if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+                throw new Error('Network error. Please check your connection or contact support.');
+            }
+
             throw error;
         }
     }
 
     /**
      * Process a payment
-     * 
-     * @param data Payment request data
-     * @returns Response with status and profile (for immediate payments) or payment URL (for online)
      */
     async processPayment(data: WPayProcessRequest): Promise<WPayResponse> {
         return this.request<WPayResponse>('/wpay/process', 'POST', data);
@@ -178,9 +191,7 @@ class WPayService {
 
     /**
      * Get user profile by email
-     * 
-     * @param email User's email address
-     * @returns User profile with balances and tier info
+     * Uses simple GET request to avoid preflight
      */
     async getProfile(email: string): Promise<{ wpay_status: WPayStatus; profile?: WPayProfile; message?: string }> {
         return this.request(`/wpay/profile/${encodeURIComponent(email)}`);
@@ -188,9 +199,6 @@ class WPayService {
 
     /**
      * Get transaction by order ID
-     * 
-     * @param orderId Unique order ID
-     * @returns Transaction details and user profile
      */
     async getTransaction(orderId: string): Promise<{
         wpay_status: WPayStatus;
@@ -203,10 +211,6 @@ class WPayService {
 
     /**
      * Preview topup rewards before processing
-     * 
-     * @param email User's email
-     * @param amount Topup amount
-     * @returns Preview of rewards (bonus, stars, tier progression)
      */
     async getTopupPreview(email: string, amount: number): Promise<{
         wpay_status: WPayStatus;
@@ -219,18 +223,13 @@ class WPayService {
 
     /**
      * Get all tier information
-     * 
-     * @returns List of all tiers with thresholds and benefits
      */
     async getTiers(): Promise<{ wpay_status: WPayStatus; tiers: WPayTier[] }> {
         return this.request('/wpay/tiers');
     }
 
     /**
-     * Manually complete a pending transaction (for development)
-     * 
-     * @param orderId Order ID to complete
-     * @returns Updated transaction and profile
+     * Manually complete a pending transaction
      */
     async completeTransaction(orderId: string): Promise<{
         wpay_status: WPayStatus;
@@ -243,11 +242,6 @@ class WPayService {
 
     /**
      * Submit payment form to Fiuu gateway
-     * 
-     * For online payments, creates and submits a form to redirect user to payment gateway.
-     * 
-     * @param paymentUrl Fiuu payment URL
-     * @param paymentData Form data to submit
      */
     submitPaymentForm(paymentUrl: string, paymentData: Record<string, any>): Promise<void> {
         return new Promise((resolve, reject) => {
@@ -285,9 +279,6 @@ class WPayService {
 
     /**
      * Generate a unique order ID
-     * 
-     * @param prefix Order ID prefix (e.g., 'ORD', 'TOP')
-     * @returns Unique order ID
      */
     generateOrderId(prefix: string = 'ORD'): string {
         const timestamp = Date.now();
@@ -297,10 +288,6 @@ class WPayService {
 
     /**
      * Check if user has sufficient balance for payment
-     * 
-     * @param profile User's WPay profile
-     * @param amount Amount to pay
-     * @returns Object with balance availability info
      */
     checkBalanceAvailability(profile: WPayProfile, amount: number): {
         canPayWithWBalance: boolean;
@@ -314,7 +301,6 @@ class WPayService {
         const wbalanceAvailable = profile.wbalance;
         const totalAvailable = bonusAvailable + wbalanceAvailable;
 
-        // Bonus is used first
         const bonusToUse = Math.min(bonusAvailable, amount);
         const remaining = amount - bonusToUse;
         const wbalanceToUse = Math.min(wbalanceAvailable, remaining);
@@ -331,9 +317,6 @@ class WPayService {
 
     /**
      * Get tier color for UI display
-     * 
-     * @param tier Tier type
-     * @returns CSS color string
      */
     getTierColor(tier: TierType): string {
         const colors: Record<TierType, string> = {
@@ -348,9 +331,6 @@ class WPayService {
 
     /**
      * Get tier gradient for UI display
-     * 
-     * @param tier Tier type
-     * @returns CSS gradient string
      */
     getTierGradient(tier: TierType): string {
         const gradients: Record<TierType, string> = {
