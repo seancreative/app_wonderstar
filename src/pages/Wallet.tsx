@@ -81,7 +81,7 @@ const Wallet: React.FC = () => {
                 <p className="font-bold text-orange-600 text-sm">RM{(balances?.bonusBalance || 0).toFixed(2)}</p>
               </div>
             </div>
-            <div className="flex items-center justify-center gap-6 mt-2 text-xs">
+            {/* <div className="flex items-center justify-center gap-6 mt-2 text-xs">
               <div>
                 <p className="text-gray-500">Lifetime Topups</p>
                 <p className="font-bold text-blue-600 text-sm">RM{(balances?.lifetimeTopup || 0).toFixed(2)}</p>
@@ -91,7 +91,7 @@ const Wallet: React.FC = () => {
                 <p className="text-gray-500">Total Transactions</p>
                 <p className="font-bold text-gray-900 text-sm">{balances?.totalTransactions || 0}</p>
               </div>
-            </div>
+            </div> */}
           </div>
           {(balances?.bonusBalance || 0) > 0 && (
             <div className="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-3">
