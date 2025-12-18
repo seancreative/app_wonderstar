@@ -798,7 +798,7 @@ const KMSKitchen: React.FC = () => {
                   <WifiOff className="w-6 h-6 text-red-300" />
                 )}
                 <div>
-                  <h2 className="text-2xl font-black">Kitchen Orders</h2>
+                  <h2 className="text-2xl font-black">Orders</h2>
                   <p className="text-sm text-blue-200 font-medium">
                     {showAllOutlets
                       ? `All Outlets (${outlets.length} locations)`

@@ -38,8 +38,8 @@ const KMSLayout: React.FC<KMSLayoutProps> = ({ children, onRefresh }) => {
                 <ChefHat className="w-7 h-7 text-white" />
               </div>
               <div>
-                <h1 className="text-2xl font-black text-gray-900">Kitchen Display</h1>
-                <p className="text-sm font-medium text-gray-600">WonderStars KMS</p>
+                <h1 className="text-2xl font-black text-gray-900">Order Display System</h1>
+                <p className="text-sm font-medium text-gray-600">WonderStars ODS</p>
               </div>
             </div>
 

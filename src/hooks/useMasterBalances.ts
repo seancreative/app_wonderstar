@@ -46,8 +46,10 @@ export function useMasterBalances({
       // ========== TRY WPAY FIRST (for most accurate real-time data) ==========
       if (userEmail) {
         try {
+          console.log('[useMasterBalances] ===== ATTEMPTING WPAY API CALL =====');
           console.log('[useMasterBalances] Fetching from WPay for email:', userEmail);
           const response = await wpayService.getProfile(userEmail);
+          console.log('[useMasterBalances] WPay API Response:', response);
 
           if (response && response.wpay_status === 'success' && response.profile) {
             const wpayProfile = response.profile;
@@ -73,11 +75,17 @@ export function useMasterBalances({
             setBalances(wpayBalances);
             setLoading(false);
             return;
+          } else {
+            console.error('[useMasterBalances] WPay response invalid:', response);
           }
         } catch (wpayError) {
-          console.log('[useMasterBalances] WPay fetch failed, falling back to Supabase:', wpayError);
+          console.error('[useMasterBalances] ===== WPAY API CALL FAILED =====');
+          console.error('[useMasterBalances] Error details:', wpayError);
+          console.error('[useMasterBalances] Falling back to Supabase...');
           // Fall through to Supabase calculation
         }
+      } else {
+        console.log('[useMasterBalances] No userEmail provided, skipping WPay');
       }
 
       // ========== FALLBACK TO SUPABASE ==========
