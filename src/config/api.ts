@@ -6,7 +6,7 @@
 // Reverting to local/env variable since proxy was removed.
 // To test production from localhost, you would need the proxy.
 // In production deployment, this will work if the backend allows your domain.
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://artventure.test';
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://app.aigenius.com.my';
 
 export const API_ENDPOINTS = {
     PASSWORD_FORGOT: `${API_BASE_URL}/password/forgot`,
@@ -21,7 +21,7 @@ export const API_ENDPOINTS = {
     WPAY_TIERS: `${API_BASE_URL}/wpay/tiers`,
 
     // Workshop API
-    WORKSHOP_GENERATE_CODE: 'https://aigeniusworkshop.test/api/generate-code',
+    WORKSHOP_GENERATE_CODE: 'https://art.aigenius.com.my/api/generate-code',
 } as const;
 
 export default { API_BASE_URL, API_ENDPOINTS };
