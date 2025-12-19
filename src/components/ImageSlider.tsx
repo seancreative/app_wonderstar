@@ -68,13 +68,12 @@ const ImageSlider: React.FC<ImageSliderProps> = ({
     <div className="relative w-full">
       <div
         ref={sliderRef}
-        className={`relative bg-gradient-to-br from-primary-100 to-primary-200 overflow-hidden ${
-          isCompact
+        className={`relative bg-gradient-to-br from-primary-100 to-primary-200 overflow-hidden ${isCompact
             ? 'h-32 rounded-xl'
             : isModal
-            ? 'aspect-square rounded-none'
-            : 'h-56 rounded-2xl'
-        }`}
+              ? 'aspect-square rounded-none'
+              : 'h-56 rounded-2xl'
+          }`}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
@@ -133,24 +132,7 @@ const ImageSlider: React.FC<ImageSliderProps> = ({
         )}
       </div>
 
-      {hasImages && totalImages > 1 && !isCompact && (
-        <div className={`flex justify-center gap-1.5 ${
-          isModal ? 'mt-2 mb-1' : 'mt-3'
-        }`}>
-          {images.map((_, index) => (
-            <button
-              key={index}
-              onClick={() => goToSlide(index)}
-              className={`h-1.5 rounded-full transition-all ${
-                index === currentIndex
-                  ? 'w-6 bg-primary-500'
-                  : 'w-1.5 bg-gray-300 hover:bg-gray-400'
-              }`}
-              aria-label={`Go to image ${index + 1}`}
-            />
-          ))}
-        </div>
-      )}
+
     </div>
   );
 };

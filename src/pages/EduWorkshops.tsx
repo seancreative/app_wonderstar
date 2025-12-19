@@ -59,7 +59,7 @@ const EduWorkshops: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen pb-28">
+    <div className="min-h-screen pb-28 pt-20">
       <PageHeader />
 
       <AIGeniusHero />
@@ -91,11 +91,10 @@ const EduWorkshops: React.FC = () => {
             <button
               key={type.value}
               onClick={() => setFilterType(type.value)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                filterType === type.value
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${filterType === type.value
                   ? 'bg-gradient-to-r from-yellow-500 to-orange-500 text-gray-900 shadow-lg'
                   : 'bg-gray-800/50 border border-yellow-400/30 text-gray-300 hover:border-yellow-400'
-              }`}
+                }`}
             >
               {type.label}
             </button>

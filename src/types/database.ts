@@ -9,6 +9,7 @@ export interface User {
   lifetime_topups: number;
   referral_code?: string;
   gacha_freespin?: number;
+  gacha_total_spins?: number;
   address?: string;
   city?: string;
   state?: string;
@@ -108,6 +109,10 @@ export interface MembershipTier {
   color: string;
   sort_order: number;
   created_at: string;
+  // Frontend helpers
+  next_tier_name?: string;
+  amount_to_next_tier?: number;
+  progress_to_next?: number;
 }
 
 export interface Badge {

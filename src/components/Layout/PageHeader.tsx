@@ -5,7 +5,12 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useShop } from '../../contexts/ShopContext';
 import { useStars } from '../../hooks/useStars';
 
-const PageHeader: React.FC = () => {
+interface PageHeaderProps {
+  variant?: 'fixed' | 'sticky' | 'static';
+  className?: string;
+}
+
+const PageHeader: React.FC<PageHeaderProps> = ({ variant = 'fixed', className = '' }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { selectedOutlet, cartCount, getCartOutlet, setSelectedOutlet } = useShop();
@@ -55,8 +60,10 @@ const PageHeader: React.FC = () => {
     return 'from-silver-400 to-silver-600';
   };
 
+  const positionClass = variant === 'fixed' ? 'fixed top-0 left-0 right-0' : variant === 'sticky' ? 'sticky top-0' : 'relative w-full';
+
   return (
-    <div className="fixed top-0 left-0 right-0 z-50 glass border-b border-white/20 backdrop-blur-2xl max-w-md mx-auto">
+    <div className={`${positionClass} z-50 glass border-b border-white/20 backdrop-blur-2xl max-w-md mx-auto ${className}`}>
       <div className="px-4 py-3">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -77,13 +84,12 @@ const PageHeader: React.FC = () => {
               <Trophy className="w-3 h-3" />
               {currentTier?.name || 'Silver'}
             </div>
-          
+
             <div className="relative">
               <button
                 onClick={handleCartClick}
-                className={`relative p-2 bg-white rounded-xl shadow-md hover:scale-110 transition-transform ${
-                  isShaking ? 'animate-cart-shake' : ''
-                }`}
+                className={`relative p-2 bg-white rounded-xl shadow-md hover:scale-110 transition-transform ${isShaking ? 'animate-cart-shake' : ''
+                  }`}
               >
                 <ShoppingCart className="w-5 h-5 text-primary-600" />
                 {cartCount > 0 && (
@@ -108,24 +114,24 @@ const PageHeader: React.FC = () => {
                   </div>
                 </div>
               )}
-              
+
             </div>
           </div>  <button
-              onClick={() => navigate('/profile')}
-              className="flex-shrink-0 hover:scale-110 active:scale-95 transition-transform"
-            >
-              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary-500 via-primary-600 to-pink-600 flex items-center justify-center text-white text-sm font-black shadow-md overflow-hidden border-2 border-white">
-                {user?.profile_picture_url ? (
-                  <img
-                    src={user.profile_picture_url}
-                    alt={user.name}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <span>{user?.name.charAt(0).toUpperCase()}</span>
-                )}
-              </div>
-            </button>
+            onClick={() => navigate('/profile')}
+            className="flex-shrink-0 hover:scale-110 active:scale-95 transition-transform"
+          >
+            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary-500 via-primary-600 to-pink-600 flex items-center justify-center text-white text-sm font-black shadow-md overflow-hidden border-2 border-white">
+              {user?.profile_picture_url ? (
+                <img
+                  src={user.profile_picture_url}
+                  alt={user.name}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span>{user?.name.charAt(0).toUpperCase()}</span>
+              )}
+            </div>
+          </button>
         </div>
       </div>
     </div>

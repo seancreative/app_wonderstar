@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { claimEggPrize, ClaimResult } from '../server/egg-gacha/claimEggPrize';
+import { gachaService, GachaSpinResult } from '../services/gachaService';
 import { activityTimelineService } from '../services/activityTimelineService';
 import { confetti } from '../utils/eggConfetti';
 import gsap from 'gsap';
@@ -29,12 +29,13 @@ export const EggGachaMachine: React.FC<EggGachaMachineProps> = ({ onReset, curre
   const [started, setStarted] = useState(false);
   const [balls, setBalls] = useState<Ball[]>([]);
   const [prizeBall, setPrizeBall] = useState<Ball | null>(null);
-  const [prize, setPrize] = useState<ClaimResult | null>(null);
+  const [prize, setPrize] = useState<GachaSpinResult | null>(null);
   const [showPrize, setShowPrize] = useState(false);
   const [hintText, setHintText] = useState('Tap to get a prize!');
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [spinType, setSpinType] = useState<'free' | 'stars'>('stars');
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const machineRef = useRef<HTMLDivElement>(null);
   const handleRef = useRef<HTMLImageElement>(null);
@@ -248,73 +249,50 @@ export const EggGachaMachine: React.FC<EggGachaMachineProps> = ({ onReset, curre
     setShowConfirmDialog(false);
   };
 
-  const useFreeSpinAndSpin = async () => {
+  // Unified spin handler that uses backend for atomic operations
+  const processSpinViaBackend = async (type: 'free' | 'stars') => {
     if (!user) return;
 
+    setIsProcessing(true);
+
     try {
-      const { supabase } = await import('../lib/supabase');
+      console.log(`[Gacha] Processing ${type} spin via backend...`);
 
-      // Decrement free spin count
-      const { error: updateError } = await supabase
-        .from('users')
-        .update({ gacha_freespin: freeSpins - 1 })
-        .eq('id', user.id);
+      const result = await gachaService.spin({
+        email: user.email,
+        spinType: type,
+      });
 
-      if (updateError) throw updateError;
+      if (!result.success) {
+        throw new Error(result.error || 'Spin failed');
+      }
 
-      // Log free spin usage
-      const { error: logError } = await supabase
-        .from('stars_transactions')
-        .insert({
-          user_id: user.id,
-          transaction_type: 'spend',
-          amount: 0,
-          multiplier: 1.0,
-          source: 'egg_gacha_free_spin',
-          metadata: {
-            action: 'free_spin_used',
-            freespins_remaining: freeSpins - 1,
-            timestamp: new Date().toISOString()
-          }
-        });
+      console.log('[Gacha] Backend spin result:', result);
 
-      if (logError) throw logError;
+      // Store the result for display later
+      setPrize(result);
 
+      // Refresh balances
+      onStarsUpdate();
       onFreeSpinsUpdate();
+
+      // Start the animation
       await handleStart();
     } catch (error) {
-      console.error('Error using free spin:', error);
-      setErrorMessage('Failed to use free spin. Please try again.');
+      console.error('Error processing spin:', error);
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to spin. Please try again.');
       setTimeout(() => setErrorMessage(null), 4000);
+    } finally {
+      setIsProcessing(false);
     }
   };
 
+  const useFreeSpinAndSpin = async () => {
+    await processSpinViaBackend('free');
+  };
+
   const deductStarsAndSpin = async () => {
-    if (!user) return;
-
-    try {
-      const { supabase } = await import('../lib/supabase');
-
-      const { error } = await supabase
-        .from('stars_transactions')
-        .insert({
-          user_id: user.id,
-          transaction_type: 'spend',
-          amount: -50,
-          multiplier: 1.0,
-          source: 'egg_gacha',
-          metadata: { action: 'gacha_spin', timestamp: new Date().toISOString() }
-        });
-
-      if (error) throw error;
-
-      onStarsUpdate();
-      await handleStart();
-    } catch (error) {
-      console.error('Error deducting stars:', error);
-      setErrorMessage('Failed to deduct stars. Please try again.');
-      setTimeout(() => setErrorMessage(null), 4000);
-    }
+    await processSpinViaBackend('stars');
   };
 
   const handleStart = async () => {
@@ -510,16 +488,16 @@ export const EggGachaMachine: React.FC<EggGachaMachineProps> = ({ onReset, curre
       count: 128
     });
 
-    const result = await claimEggPrize(user.id, user.name || user.email);
-    setPrize(result);
+    // Prize was already claimed via backend in processSpinViaBackend
+    // Just show the stored result
     setShowPrize(true);
 
     // Log gacha spin activity
-    if (result.status === 'ok') {
+    if (prize?.status === 'ok') {
       try {
         await activityTimelineService.helpers.logGachaSpin(
           user.id,
-          result.reward_label || 'Prize',
+          prize.reward_label || 'Prize',
           50
         );
       } catch (activityError) {
@@ -533,7 +511,7 @@ export const EggGachaMachine: React.FC<EggGachaMachineProps> = ({ onReset, curre
     gsap.to(prizeBallEl, { opacity: 0 });
 
     gsap.set(titleRef.current, { y: '-50vh' });
-    setHintText(result.status === 'ok' ? `You got ${result.reward_label}!` : 'No prizes left!');
+    setHintText(prize?.status === 'ok' ? `You got ${prize.reward_label}!` : 'No prizes left!');
 
     gsap.to(titleRef.current, {
       delay: 1,
@@ -643,10 +621,10 @@ export const EggGachaMachine: React.FC<EggGachaMachineProps> = ({ onReset, curre
                       fontSize: '3vh',
                       fontWeight: 'bold',
                       letterSpacing: '0.15vh',
-                                            fontFamily: "'Press Start 2P', 'Courier New', monospace",
+                      fontFamily: "'Press Start 2P', 'Courier New', monospace",
 
                       marginBottom: '1vh'
-                    
+
                     }}>
                       YOU WON!
                     </div>
@@ -806,13 +784,13 @@ export const EggGachaMachine: React.FC<EggGachaMachineProps> = ({ onReset, curre
                   textTransform: 'uppercase',
                   fontWeight: 'bold',
 
-  
-              letterSpacing: '0.05rem',
-              textShadow: '-2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000',
-              fontFamily: "'Press Start 2P', 'Courier New', monospace"
+
+                  letterSpacing: '0.05rem',
+                  textShadow: '-2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000',
+                  fontFamily: "'Press Start 2P', 'Courier New', monospace"
 
 
-                  
+
                 }}
               >
                 {spinType === 'free' ? (

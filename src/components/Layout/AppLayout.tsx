@@ -1,11 +1,10 @@
 import React from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
+import { Outlet } from 'react-router-dom';
 import BottomNav from './BottomNav';
 import { useTheme } from '../../contexts/ThemeContext';
 
 const AppLayout: React.FC = () => {
   const { theme } = useTheme();
-  const location = useLocation();
 
   const getBackgroundClass = () => {
     switch (theme) {
@@ -26,9 +25,7 @@ const AppLayout: React.FC = () => {
         <Outlet />
       </main>
       <BottomNav />
-      <div className="fixed bottom-20 left-2 z-50 bg-black/80 text-white text-[10px] px-2 py-1 rounded font-mono">
-        {location.pathname.split('/').pop() || 'home'}.tsx
-      </div>
+
     </div>
   );
 };

@@ -26,18 +26,14 @@ const EggGachaPage: React.FC = () => {
   }, [user, navigate]);
 
   const loadFreeSpins = async () => {
-    if (!user) return;
+    if (!user?.email) return;
 
     try {
-      const { supabase } = await import('../lib/supabase');
-      const { data, error } = await supabase
-        .from('users')
-        .select('gacha_freespin')
-        .eq('id', user.id)
-        .single();
+      const { gachaService } = await import('../services/gachaService');
+      const result = await gachaService.getBalance(user.email);
 
-      if (!error && data) {
-        setFreeSpins(data.gacha_freespin || 0);
+      if (result.success && result.balances) {
+        setFreeSpins(result.balances.freeSpins || 0);
       }
     } catch (error) {
       console.error('Error loading free spins:', error);
@@ -147,8 +143,8 @@ const EggGachaPage: React.FC = () => {
                     position: 'absolute',
                     top: '-10px',
                     left: '-10px',
-                    
-                 
+
+
                     padding: '0.15rem 0.35rem',
                     borderRadius: '0.25rem',
                     transform: 'rotate(-12deg)',

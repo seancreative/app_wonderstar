@@ -54,7 +54,7 @@ const Stars: React.FC = () => {
   const starsStampsRef = useRef<HTMLDivElement>(null);
   const vouchersRef = useRef<HTMLDivElement>(null);
   const rewardsRef = useRef<HTMLDivElement>(null);
-  const tierRef = useRef<HTMLDivElement>(null);
+  const tierRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     loadVouchers();
@@ -137,7 +137,7 @@ const Stars: React.FC = () => {
     }
   };
 
-  const scrollToSection = (section: string, ref: React.RefObject<HTMLDivElement>) => {
+  const scrollToSection = (section: string, ref: React.RefObject<HTMLElement>) => {
     setActiveSection(section);
     ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
@@ -174,17 +174,11 @@ const Stars: React.FC = () => {
   };
 
   const getProgressPercentage = () => {
-    if (!currentTier || !nextTier) return 100;
-    const current = user?.lifetime_topups || 0;
-    const range = nextTier.threshold - currentTier.threshold;
-    const progress = current - currentTier.threshold;
-    return Math.min((progress / range) * 100, 100);
+    return currentTier?.progress_to_next || 100;
   };
 
   const getAmountToNextTier = () => {
-    if (!nextTier) return 0;
-    const current = user?.lifetime_topups || 0;
-    return Math.max(nextTier.threshold - current, 0);
+    return currentTier?.amount_to_next_tier || 0;
   };
 
   const InfoTooltip = ({ id, content }: { id: string; content: string }) => (
@@ -268,8 +262,8 @@ const Stars: React.FC = () => {
                       key={item.id}
                       onClick={() => scrollToSection(item.id, item.ref)}
                       className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-xs whitespace-nowrap transition-all ${activeSection === item.id
-                          ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white shadow-glow scale-105'
-                          : 'bg-white/10 text-white/80 hover:bg-white/20'
+                        ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white shadow-glow scale-105'
+                        : 'bg-white/10 text-white/80 hover:bg-white/20'
                         }`}
                     >
                       <item.icon className="w-4 h-4" />
@@ -432,8 +426,8 @@ const Stars: React.FC = () => {
                         key={tab}
                         onClick={() => setVoucherTab(tab as any)}
                         className={`px-4 py-2 rounded-xl font-bold text-xs whitespace-nowrap transition-all ${voucherTab === tab
-                            ? 'bg-white text-purple-600 shadow-lg'
-                            : 'bg-white/10 text-white/80 hover:bg-white/20'
+                          ? 'bg-white text-purple-600 shadow-lg'
+                          : 'bg-white/10 text-white/80 hover:bg-white/20'
                           }`}
                       >
                         {tab.charAt(0).toUpperCase() + tab.slice(1)}
@@ -601,8 +595,8 @@ const Stars: React.FC = () => {
                                 onClick={() => handleRedeemRewardClick(reward)}
                                 disabled={!canAfford}
                                 className={`w-full py-2 rounded-xl font-bold text-sm transition-all ${canAfford
-                                    ? 'bg-gradient-to-r from-pink-500 to-rose-600 text-white hover:scale-105 shadow-lg'
-                                    : 'bg-white/10 text-white/50 cursor-not-allowed'
+                                  ? 'bg-gradient-to-r from-pink-500 to-rose-600 text-white hover:scale-105 shadow-lg'
+                                  : 'bg-white/10 text-white/50 cursor-not-allowed'
                                   }`}
                               >
                                 {canAfford ? (

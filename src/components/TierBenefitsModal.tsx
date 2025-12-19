@@ -13,8 +13,8 @@ interface TierBenefitsModalProps {
 
 const TierBenefitsModal: React.FC<TierBenefitsModalProps> = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const { currentTier, nextTier } = useStars();
+  // const { user } = useAuth(); // Removed, using lifetimeTopups from useStars
+  const { currentTier, nextTier, lifetimeTopups } = useStars();
   const [allTiers, setAllTiers] = React.useState<MembershipTier[]>([]);
 
   React.useEffect(() => {
@@ -36,7 +36,7 @@ const TierBenefitsModal: React.FC<TierBenefitsModalProps> = ({ isOpen, onClose }
 
   const getAmountToNextTier = () => {
     if (!nextTier) return 0;
-    const current = user?.lifetime_topups || 0;
+    const current = lifetimeTopups;
     return Math.max(nextTier.threshold - current, 0);
   };
 
@@ -71,14 +71,14 @@ const TierBenefitsModal: React.FC<TierBenefitsModalProps> = ({ isOpen, onClose }
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in"
       onClick={onClose}
     >
       <div
-        className="relative bg-gradient-to-br from-white to-gray-50 rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-2xl animate-scale-in"
+        className="relative bg-gradient-to-br from-white to-gray-50 rounded-3xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl animate-scale-in"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="sticky top-0 z-10 bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 p-6 text-white">
+        <div className="flex-shrink-0 bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 p-6 text-white relative">
           <button
             onClick={onClose}
             className="absolute top-4 right-4 p-2 hover:bg-white/20 rounded-full transition-colors"
@@ -97,7 +97,7 @@ const TierBenefitsModal: React.FC<TierBenefitsModalProps> = ({ isOpen, onClose }
           </div>
 
 
-          <div className="mt-4 grid grid-cols-2 gap-3">
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
             {currentTier && (
               <div className="p-3 bg-white/10 rounded-xl backdrop-blur-sm border border-white/20">
                 <div className="flex items-center gap-2">
@@ -126,8 +126,8 @@ const TierBenefitsModal: React.FC<TierBenefitsModalProps> = ({ isOpen, onClose }
           </div>
         </div>
 
-        <div className="overflow-y-auto p-6 max-h-[calc(90vh-280px)]">
-          <div className="grid grid-cols-2 gap-3">
+        <div className="flex-1 overflow-y-auto p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {allTiers.map((tier, index) => {
               const Icon = getTierIcon(tier.name);
               const isCurrentTier = currentTier?.id === tier.id;
@@ -135,11 +135,10 @@ const TierBenefitsModal: React.FC<TierBenefitsModalProps> = ({ isOpen, onClose }
               return (
                 <div
                   key={tier.id}
-                  className={`relative p-4 rounded-2xl border-2 transition-all ${
-                    isCurrentTier
-                      ? 'border-purple-500 bg-gradient-to-br from-purple-50 to-indigo-50 shadow-xl'
-                      : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-lg'
-                  }`}
+                  className={`relative p-4 rounded-2xl border-2 transition-all ${isCurrentTier
+                    ? 'border-purple-500 bg-gradient-to-br from-purple-50 to-indigo-50 shadow-xl'
+                    : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-lg'
+                    }`}
                 >
                   {isCurrentTier && (
                     <div className="absolute -top-2 left-3 px-3 py-0.5 bg-gradient-to-r from-purple-500 to-indigo-600 text-white text-xs font-black rounded-full shadow-lg">
@@ -153,9 +152,9 @@ const TierBenefitsModal: React.FC<TierBenefitsModalProps> = ({ isOpen, onClose }
                     </div>
                     <div className="flex-1">
                       <h3 className="text-xl font-black text-gray-900">{tier.name}</h3>
-                      {!isCurrentTier && user && tier.threshold > (user.lifetime_topups || 0) && (
-                        <p className="text-xs text-gray-600 font-bold">
-                          Unlocked!
+                      {!isCurrentTier && tier.threshold > lifetimeTopups && (
+                        <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">
+                          Locked
                         </p>
                       )}
                       {isCurrentTier && (
@@ -163,7 +162,7 @@ const TierBenefitsModal: React.FC<TierBenefitsModalProps> = ({ isOpen, onClose }
                           Current tier
                         </p>
                       )}
-                      {user && tier.threshold <= (user.lifetime_topups || 0) && !isCurrentTier && (
+                      {tier.threshold <= lifetimeTopups && !isCurrentTier && (
                         <p className="text-xs text-green-600 font-bold">
                           Unlocked!
                         </p>
@@ -226,7 +225,7 @@ const TierBenefitsModal: React.FC<TierBenefitsModalProps> = ({ isOpen, onClose }
           </div>
         </div>
 
-        <div className="sticky bottom-0 p-6 bg-gradient-to-t from-white via-white to-transparent border-t border-gray-200">
+        <div className="flex-shrink-0 p-6 bg-gradient-to-t from-white via-white to-transparent border-t border-gray-200">
           <button
             onClick={() => {
               onClose();

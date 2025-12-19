@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Star, Store, Search, X } from 'lucide-react';
+import { ArrowLeft, Star, Store, Search, X, Plus } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useShop } from '../contexts/ShopContext';
@@ -53,7 +53,7 @@ const ShopMenu: React.FC = () => {
   const navigate = useNavigate();
   const { outletSlug } = useParams();
   const { user } = useAuth();
-  const { selectedOutlet, refreshCartCount, clearOutlet, addToCart, cartCount, clearCart } = useShop();
+  const { selectedOutlet, refreshCartCount, clearOutlet, cartCount, clearCart } = useShop();
   const { loading: walletLoading } = useWallet();
 
   const [selectedCategory, setSelectedCategory] = useState<string | null>('all');
@@ -67,7 +67,7 @@ const ShopMenu: React.FC = () => {
   const [showChangeOutletWarning, setShowChangeOutletWarning] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [availableSubcategories, setAvailableSubcategories] = useState<Subcategory[]>([]);
-  const [categories, setCategories] = useState<Array<{id: string; name: string; icon?: string; category_id: string}>>([]);
+  const [categories, setCategories] = useState<Array<{ id: string; name: string; icon?: string; category_id: string }>>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -356,28 +356,26 @@ const ShopMenu: React.FC = () => {
   const shouldHideVoucherBanner = outletSlug === 'melaka' || outletSlug === 'kuala-terengganu';
 
   return (
-    <div className="min-h-screen pb-28 bg-gradient-to-b from-primary-50 to-white">
-      <PageHeader />
-      {!shouldHideVoucherBanner && (
-        <VoucherBanner
-          voucherCode={appliedVoucher || undefined}
-          isApplied={!!appliedVoucher}
-          onApply={handleVoucherClick}
-          onRemove={handleRemoveVoucher}
-        />
-      )}
-      {isInitialLoading ? (
-        <div className="max-w-md mx-auto">
-          <LoadingScreen variant="content" text="Loading menu..." />
-        </div>
-      ) : (
-        <>
-      <div className={`fixed left-0 right-0 z-40 glass border-b border-white/20 backdrop-blur-2xl max-w-md mx-auto ${shouldHideVoucherBanner ? 'top-[72px]' : (appliedVoucher ? 'top-[200px]' : 'top-[144px]')}`}>
+    <div className="flex flex-col h-screen bg-gradient-to-b from-primary-50 to-white overflow-hidden max-w-md mx-auto shadow-xl">
+      {/* Fixed Header Section */}
+      <div className="flex-none z-50 bg-white/80 backdrop-blur-md border-b border-white/20">
+        <PageHeader variant="static" />
+
+        {!shouldHideVoucherBanner && (
+          <VoucherBanner
+            voucherCode={appliedVoucher || undefined}
+            isApplied={!!appliedVoucher}
+            onApply={handleVoucherClick}
+            onRemove={handleRemoveVoucher}
+          />
+        )}
+
+        {/* Outlet Header */}
         <div className="px-4 py-2">
           <div className="flex items-center gap-3">
             <button
               onClick={() => navigate('/home')}
-              className="p-1.5 hover:bg-white/50 rounded-lg transition-colors flex-shrink-0"
+              className="p-1.5 hover:bg-black/5 rounded-lg transition-colors flex-shrink-0"
             >
               <ArrowLeft className="w-5 h-5 text-gray-700" />
             </button>
@@ -385,200 +383,226 @@ const ShopMenu: React.FC = () => {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-0.5">
                   <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
+                  <span className="text-[10px] font-bold text-green-600 uppercase tracking-wider">Open</span>
                 </div>
                 <h1 className="text-base font-black text-gray-900 truncate leading-tight">{selectedOutlet?.name}</h1>
                 <p className="text-[10px] text-gray-500 truncate">{selectedOutlet?.location}</p>
               </div>
               <button
                 onClick={handleChangeStore}
-                className="flex items-center gap-1 text-[10px] text-primary-600 font-bold hover:bg-primary-50 px-2 py-1 rounded-lg transition-colors flex-shrink-0"
+                className="flex items-center gap-1 text-[10px] text-primary-600 font-bold hover:bg-primary-50 px-2 py-1 rounded-lg transition-colors flex-shrink-0 border border-primary-100"
               >
                 <Store className="w-3 h-3" />
-                Change Outlet
+                Change
               </button>
             </div>
           </div>
         </div>
-      </div>
 
-      <div className={`max-w-md mx-auto px-4 py-2 ${shouldHideVoucherBanner ? 'mt-[128px]' : (appliedVoucher ? 'mt-[256px]' : 'mt-[200px]')}`}>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search products..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-10 py-2.5 glass rounded-xl text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all"
-          />
-          {searchTerm && (
-            <button
-              onClick={() => setSearchTerm('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded-full transition-colors"
-            >
-              <X className="w-4 h-4 text-gray-500" />
-            </button>
-          )}
-        </div>
-      </div>
-
-      <div className={`max-w-md mx-auto flex ${shouldHideVoucherBanner ? 'h-[calc(100vh-240px)]' : 'h-[calc(100vh-300px)]'}`}>
-        <div className="w-12 glass border-r border-white/20 p-0.5 space-y-0.5 overflow-y-auto">
-          {categoriesLoading ? (
-            <div className="flex justify-center py-4">
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary-600"></div>
-            </div>
-          ) : (
-            <>
-              {categories.map((category) => (
-                <button
-                  key={category.id}
-                  onClick={() => {
-                    setSelectedCategory(category.id);
-                    setSelectedSubcategory(null);
-                  }}
-                  className={`w-full p-1 rounded-lg text-center transition-all ${
-                    selectedCategory === category.id
-                      ? 'bg-primary-500 text-white shadow-lg'
-                      : 'bg-white text-gray-700 hover:bg-gray-50'
-                  }`}
-                >
-                  <div className="text-lg mb-0.5">{category.icon || '🎁'}</div>
-                  <div className="text-[7px] font-bold leading-tight">{category.name}</div>
-                </button>
-              ))}
-            </>
-          )}
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-2.5">
-          <div className="sticky top-0 z-30 bg-gradient-to-b from-primary-50 via-primary-50 to-transparent pb-3 -mx-2.5 px-2.5 mb-2">
-            <div className="flex flex-wrap gap-1.5 mb-2">
-              {getCurrentFilters().map((filter) => (
-                <button
-                  key={filter.id}
-                  onClick={() => {
-                    setSelectedSubcategory(filter.id);
-                  }}
-                  className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all flex-shrink-0 ${
-                    ((!selectedSubcategory && filter.id === 'all') || selectedSubcategory === filter.id)
-                      ? 'bg-primary-500 text-white shadow-md'
-                      : 'bg-white text-gray-600 hover:bg-gray-100'
-                  }`}
-                >
-                  {filter.label}
-                </button>
-              ))}
-            </div>
+        {/* Search Bar */}
+        <div className="px-4 pb-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search products..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-10 py-2.5 bg-gray-100/50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all"
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-200 rounded-full transition-colors"
+              >
+                <X className="w-4 h-4 text-gray-500" />
+              </button>
+            )}
           </div>
+        </div>
+      </div>
 
-          {loading ? (
-            <div className="flex justify-center py-12">
-              <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-primary-600"></div>
+      {/* Main Content Area - Flex Grow to fill remaining space */}
+      <div className="flex-1 flex overflow-hidden relative">
+        {isInitialLoading ? (
+          <div className="w-full h-full flex items-center justify-center">
+            <LoadingScreen variant="content" text="Loading menu..." />
+          </div>
+        ) : (
+          <>
+            {/* Sidebar - Categories (WIDENED to w-20) */}
+            <div className="w-20 flex-none bg-white border-r border-gray-100 overflow-y-auto no-scrollbar pb-24">
+              {categoriesLoading ? (
+                <div className="flex justify-center py-4">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary-600"></div>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-1 p-1">
+                  {categories.map((category) => (
+                    <button
+                      key={category.id}
+                      onClick={() => {
+                        setSelectedCategory(category.id);
+                        setSelectedSubcategory(null);
+                      }}
+                      className={`w-full p-2 rounded-xl flex flex-col items-center justify-center gap-1 transition-all ${selectedCategory === category.id
+                        ? 'bg-primary-50 text-primary-600 shadow-sm ring-1 ring-primary-200'
+                        : 'text-gray-500 hover:bg-gray-50'
+                        }`}
+                    >
+                      <div className="text-2xl">{category.icon || '🎁'}</div>
+                      <span className={`text-[10px] font-bold text-center leading-tight line-clamp-2 ${selectedCategory === category.id ? 'text-primary-700' : 'text-gray-500'
+                        }`}>
+                        {category.name}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-          ) : getFilteredProducts().length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-xs text-gray-600">No products available</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-2">
-              {getFilteredProducts().map((product) => (
-                <div
-                  key={product.id}
-                  onClick={() => handleProductClick(product)}
-                  className="glass rounded-xl overflow-hidden hover:shadow-lg active:scale-95 transition-all cursor-pointer"
-                >
-                  <div className="relative aspect-square bg-gradient-to-br from-primary-100 to-primary-200 flex items-center justify-center overflow-hidden">
-                    {product.image_url ? (
-                      <img
-                        src={product.image_url}
-                        alt={product.name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="text-3xl">
-                        {categories.find(cat => cat.id === selectedCategory)?.icon || '🎁'}
-                      </div>
-                    )}
-                    {product.is_recommended && (
-                      <div className="absolute top-1 left-1 bg-gradient-to-r from-amber-500 to-yellow-500 text-white px-1.5 py-0.5 rounded-full shadow-lg z-20 flex items-center gap-0.5">
-                        <Star className="w-2.5 h-2.5" fill="currentColor" />
-                        <span className="text-[8px] font-bold">RECOMMENDED</span>
-                      </div>
-                    )}
-                    {product.special_discount && (
-                      <>
-                        {!appliedVoucherDetails ? (
+
+            {/* Main Product Grid */}
+            <div className="flex-1 overflow-y-auto pb-28 px-3">
+              {/* Sticky Filters */}
+              <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm -mx-3 px-3 py-3 border-b border-gray-100 mb-3">
+                <div className="flex overflow-x-auto gap-2 no-scrollbar pb-1">
+                  {getCurrentFilters().map((filter) => (
+                    <button
+                      key={filter.id}
+                      onClick={() => {
+                        setSelectedSubcategory(filter.id);
+                      }}
+                      className={`px-3 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap transition-all flex-shrink-0 ${((!selectedSubcategory && filter.id === 'all') || selectedSubcategory === filter.id)
+                        ? 'bg-black text-white shadow-md'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-100'
+                        }`}
+                    >
+                      {filter.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {loading ? (
+                <div className="flex justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+                </div>
+              ) : getFilteredProducts().length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+                  <Store className="w-12 h-12 mb-2 opacity-20" />
+                  <p className="text-sm font-medium">No products found</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {getFilteredProducts().map((product) => (
+                    <div
+                      key={product.id}
+                      onClick={() => handleProductClick(product)}
+                      className="group bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-md hover:border-primary-200 active:scale-[0.98] transition-all cursor-pointer"
+                    >
+                      <div className="relative aspect-square bg-gray-100 overflow-hidden">
+                        {product.image_url ? (
+                          <img
+                            src={product.image_url}
+                            alt={product.name}
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-3xl bg-gray-50">
+                            {categories.find(cat => cat.id === selectedCategory)?.icon || '🎁'}
+                          </div>
+                        )}
+
+                        {/* Tags Overlay */}
+                        <div className="absolute inset-0 p-1 pointer-events-none">
+                          <div className="flex flex-wrap gap-1">
+                            {product.is_recommended && (
+                              <span className="bg-amber-400 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full shadow-sm flex items-center gap-0.5">
+                                <Star className="w-2 h-2 fill-current" />
+                                BEST
+                              </span>
+                            )}
+                            {product.weekend_price && product.weekend_price !== product.base_price && (
+                              <span className="bg-purple-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full shadow-sm">
+                                WKND
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Top Right Tags */}
+                          <div className="absolute top-1 right-1 flex flex-col items-end gap-1">
+                            {product.bonus_stars && product.bonus_stars > 0 && (
+                              <span className="bg-black/70 backdrop-blur-md text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5 border border-white/20">
+                                <Star className="w-2.5 h-2.5 fill-yellow-400 text-yellow-400" />
+                                +{product.bonus_stars}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {product.special_discount && !appliedVoucherDetails && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               navigate('/stars');
                             }}
-                            className="absolute top-1 right-1 bg-red-500 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg z-10 hover:bg-red-600 transition-colors active:scale-95"
+                            className="absolute bottom-1 right-1 bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded-lg shadow-lg z-10 transition-colors pointer-events-auto"
                           >
-                            <span className="text-[8px] font-black leading-tight text-center">USE<br/>VOUCHER</span>
+                            <div className="text-[8px] font-bold leading-none text-center">
+                              USE<br />VOUCHER
+                            </div>
                           </button>
-                        ) : appliedVoucherDetails.restriction_type === 'special_discount' ? (
-                          <div className="absolute top-1 right-1 bg-red-500 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg z-10">
-                            <span className="text-[10px] font-black leading-tight text-center">-RM5</span>
+                        )}
+                        {product.special_discount && appliedVoucherDetails?.restriction_type === 'special_discount' && (
+                          <div className="absolute bottom-1 right-1 bg-red-500 text-white px-2 py-1 rounded-lg shadow-lg z-10">
+                            <div className="text-[10px] font-black leading-none text-center">
+                              -RM5
+                            </div>
                           </div>
-                        ) : null}
-                      </>
-                    )}
-                    {product.bonus_stars && product.bonus_stars > 0 && (
-                      <div className={`absolute ${
-                        product.special_discount && (
-                          !appliedVoucherDetails ||
-                          appliedVoucherDetails.restriction_type === 'special_discount'
-                        ) ? 'top-12 right-1' : 'top-1 right-1'
-                      } flex items-center gap-0.5 bg-primary-500 text-white px-1 py-0.5 rounded-full z-10`}>
-                        <Star className="w-2.5 h-2.5" fill="currentColor" />
-                        <span className="text-[9px] font-bold">+{product.bonus_stars}</span>
+                        )}
                       </div>
-                    )}
-                    {product.weekend_price && product.weekend_price !== product.base_price && (
-                      <div className="absolute top-1 left-1 bg-purple-500 text-white px-1.5 py-0.5 rounded-full">
-                        <span className="text-[9px] font-bold">WKND</span>
+
+                      <div className="p-3 space-y-1.5">
+                        <div>
+                          <h3 className="font-bold text-gray-900 text-xs leading-tight line-clamp-2 h-8">
+                            {product.name}
+                          </h3>
+                          <p className="text-[10px] text-gray-500 line-clamp-1 mt-0.5">
+                            {getShortDescription(product)}
+                          </p>
+                        </div>
+
+                        <div className="flex items-end justify-between pt-1 border-t border-gray-50">
+                          <div className="flex flex-col">
+                            {product.special_discount && appliedVoucherDetails?.restriction_type === 'special_discount' ? (
+                              <>
+                                <span className="text-[10px] text-gray-400 line-through font-medium">
+                                  {formatPrice(product.base_price)}
+                                </span>
+                                <span className="text-sm font-black text-red-600 leading-none">
+                                  {formatPrice(product.base_price - 5)}
+                                </span>
+                              </>
+                            ) : (
+                              <span className="text-sm font-black text-gray-900 leading-none">
+                                {formatPrice(product.base_price)}
+                              </span>
+                            )}
+                          </div>
+                          <div className="h-6 w-6 rounded-full bg-primary-50 flex items-center justify-center text-primary-600 group-hover:bg-primary-500 group-hover:text-white transition-colors">
+                            <Plus className="w-4 h-4" />
+                          </div>
+                        </div>
                       </div>
-                    )}
-                  </div>
-
-                  <div className="p-2 space-y-1">
-                    <div>
-                      <h3 className="font-bold text-gray-900 text-[11px] leading-tight line-clamp-2">{product.name}</h3>
-                      <p className="text-[10px] text-gray-500">
-                        {getShortDescription(product)}
-                      </p>
                     </div>
-
-                    <div className="pt-0.5">
-                      {product.special_discount && appliedVoucherDetails?.restriction_type === 'special_discount' ? (
-                        <>
-                          <p className="text-sm font-bold text-gray-400 line-through">
-                            {formatPrice(product.base_price)}
-                          </p>
-                          <p className="text-base font-black text-red-600">
-                            {formatPrice(product.base_price - 5)}
-                          </p>
-                        </>
-                      ) : (
-                        <p className="text-base font-black text-gray-900">
-                          {formatPrice(product.base_price)}
-                        </p>
-                      )}
-                      {product.weekend_price && product.weekend_price !== product.base_price && (
-                        <p className="text-[9px] text-purple-600 font-bold">
-                          Wknd: {formatPrice(product.weekend_price)}
-                        </p>
-                      )}
-                    </div>
-                  </div>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
-          )}
-        </div>
+          </>
+        )}
       </div>
+
       <AddToCartToast
         show={showToast}
         productName={toastProductName}
@@ -607,10 +631,11 @@ const ShopMenu: React.FC = () => {
           }}
         />
       )}
-        </>
-      )}
 
-      <BottomNav />
+      {/* Fixed Bottom Navigation */}
+      <div className="flex-none z-50">
+        <BottomNav />
+      </div>
     </div>
   );
 };

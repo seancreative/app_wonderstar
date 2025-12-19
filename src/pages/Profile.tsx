@@ -7,8 +7,8 @@ import { supabase } from '../lib/supabase';
 import {
   Phone, Mail, Users, LogOut,
   ChevronRight,
-  Sparkles, Gift, Star,
-  Edit, Trophy, Crown, TrendingUp, Info, Wallet, CheckCircle
+  Star,
+  Edit, Trophy, Crown, Info, Wallet, CheckCircle
 } from 'lucide-react';
 import PageHeader from '../components/Layout/PageHeader';
 import EditChildModal from '../components/EditChildModal';
@@ -99,18 +99,18 @@ const Profile: React.FC = () => {
                   {balancesLoading ? '...' : 'Refresh'}
                 </button>
               </div>
-              <div className="grid grid-cols-3 gap-3 mb-3">
-                <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-2xl p-4 border-2 border-green-200">
-                  <p className="text-xs font-bold text-green-700 mb-1">W Balance</p>
-                  <p className="text-xl font-black text-green-900">RM{(balances?.wBalance || 0).toFixed(2)}</p>
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-2xl p-2.5 border-2 border-green-200 overflow-hidden">
+                  <p className="text-[10px] font-bold text-green-700 mb-0.5 truncate uppercase tracking-tight">W Balance</p>
+                  <p className="text-base sm:text-lg font-black text-green-900 break-all leading-none">RM{(balances?.wBalance || 0).toFixed(2)}</p>
                 </div>
-                <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-2xl p-4 border-2 border-purple-200">
-                  <p className="text-xs font-bold text-purple-700 mb-1">Bonus</p>
-                  <p className="text-xl font-black text-purple-900">RM{(balances?.bonusBalance || 0).toFixed(2)}</p>
+                <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-2xl p-2.5 border-2 border-purple-200 overflow-hidden">
+                  <p className="text-[10px] font-bold text-purple-700 mb-0.5 truncate uppercase tracking-tight">Bonus</p>
+                  <p className="text-base sm:text-lg font-black text-purple-900 break-all leading-none">RM{(balances?.bonusBalance || 0).toFixed(2)}</p>
                 </div>
-                <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-2xl p-4 border-2 border-yellow-200">
-                  <p className="text-xs font-bold text-yellow-700 mb-1">Stars</p>
-                  <p className="text-xl font-black text-yellow-900">{(balances?.starsBalance || 0).toLocaleString()}</p>
+                <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-2xl p-2.5 border-2 border-yellow-200 overflow-hidden">
+                  <p className="text-[10px] font-bold text-yellow-700 mb-0.5 truncate uppercase tracking-tight">Stars</p>
+                  <p className="text-base sm:text-lg font-black text-yellow-900 break-all leading-none">{(balances?.starsBalance || 0).toLocaleString()}</p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -231,10 +231,10 @@ const Profile: React.FC = () => {
                   <div className="space-y-4">
                     <div className="flex items-center gap-4">
                       <div className={`p-4 rounded-2xl shadow-lg ${currentTier.name === 'Bronze' ? 'bg-gradient-to-br from-amber-700 to-amber-900' :
-                          currentTier.name === 'Silver' ? 'bg-gradient-to-br from-gray-400 to-gray-600' :
-                            currentTier.name === 'Gold' ? 'bg-gradient-to-br from-yellow-400 to-yellow-600' :
-                              currentTier.name === 'Platinum' ? 'bg-gradient-to-br from-slate-300 to-slate-500' :
-                                'bg-gradient-to-br from-purple-500 to-purple-700'
+                        currentTier.name === 'Silver' ? 'bg-gradient-to-br from-gray-400 to-gray-600' :
+                          currentTier.name === 'Gold' ? 'bg-gradient-to-br from-yellow-400 to-yellow-600' :
+                            currentTier.name === 'Platinum' ? 'bg-gradient-to-br from-slate-300 to-slate-500' :
+                              'bg-gradient-to-br from-purple-500 to-purple-700'
                         }`}>
                         <Crown className="w-8 h-8 text-white" />
                       </div>
@@ -273,14 +273,14 @@ const Profile: React.FC = () => {
                             <span className="text-xs font-bold text-gray-700">Next: {nextTier.name}</span>
                           </div>
                           <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-black">
-                            RM{(nextTier.threshold - (user?.lifetime_topups || 0)).toFixed(0)} to go
+                            RM{(currentTier.amount_to_next_tier || 0).toFixed(2)} to go
                           </span>
                         </div>
                         <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                           <div
                             className="h-full bg-gradient-to-r from-green-400 to-green-600 transition-all duration-500"
                             style={{
-                              width: `${Math.min(((user?.lifetime_topups || 0) - currentTier.threshold) / (nextTier.threshold - currentTier.threshold) * 100, 100)}%`
+                              width: `${currentTier.progress_to_next || 0}%`
                             }}
                           />
                         </div>

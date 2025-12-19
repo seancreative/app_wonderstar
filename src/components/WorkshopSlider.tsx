@@ -168,21 +168,7 @@ const WorkshopSlider: React.FC = () => {
           )}
         </div>
 
-        {workshops.length > 1 && (
-          <div className="flex justify-center gap-1.5 py-3">
-            {workshops.map((_, index) => (
-              <button
-                key={index}
-                onClick={() => setCurrentIndex(index)}
-                className={`h-1.5 rounded-full transition-all ${
-                  index === currentIndex
-                    ? 'bg-gradient-to-r from-purple-500 to-pink-500 w-6'
-                    : 'bg-gray-300 w-1.5'
-                }`}
-              />
-            ))}
-          </div>
-        )}
+
       </div>
 
       {selectedWorkshop && (

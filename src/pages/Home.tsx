@@ -47,7 +47,7 @@ const Home: React.FC = () => {
     loading: balancesLoading
   });
 
-  const { currentTier } = useStars();
+  const { currentTier, lifetimeTopups } = useStars();
   const [currentSlide, setCurrentSlide] = useState(0);
   const [showVoucherModal, setShowVoucherModal] = useState(false);
   const [showTierBenefitsModal, setShowTierBenefitsModal] = useState(false);
@@ -168,10 +168,10 @@ const Home: React.FC = () => {
                 <div
                   key={banner.id}
                   className={`absolute inset-0 transition-all duration-1000 ease-in-out ${index === currentSlide
-                      ? 'opacity-100 translate-x-0'
-                      : index < currentSlide
-                        ? 'opacity-0 -translate-x-full'
-                        : 'opacity-0 translate-x-full'
+                    ? 'opacity-100 translate-x-0'
+                    : index < currentSlide
+                      ? 'opacity-0 -translate-x-full'
+                      : 'opacity-0 translate-x-full'
                     }`}
                 >
                   <div className="relative w-full h-full">
@@ -187,18 +187,6 @@ const Home: React.FC = () => {
                   </div>
                 </div>
               ))}
-              {banners.length > 0 && (
-                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
-                  {banners.map((_, index) => (
-                    <button
-                      key={index}
-                      onClick={() => setCurrentSlide(index)}
-                      className={`h-1.5 rounded-full transition-all ${index === currentSlide ? 'w-6 bg-white' : 'w-1.5 bg-white/50'
-                        }`}
-                    />
-                  ))}
-                </div>
-              )}
             </div>
 
             {/* Main Balance Cards - Horizontal Layout */}
@@ -367,7 +355,7 @@ const Home: React.FC = () => {
                     <span className="text-purple-600 font-black">
                       {currentTier?.amount_to_next_tier === 0
                         ? 'Max Tier!'
-                        : (user?.lifetime_topups === 0 || !user?.lifetime_topups)
+                        : (lifetimeTopups === 0)
                           ? 'Unlock Better Rewards!'
                           : `RM${(currentTier?.amount_to_next_tier || 0).toFixed(2)} more needed`
                       }
@@ -436,7 +424,7 @@ const Home: React.FC = () => {
             </div>
             <button
               onClick={() => navigate('/egg-gacha')}
-              className="relative group overflow-hidden rounded-lg p-0 border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[4px] hover:translate-y-[4px] transition-all active:shadow-none active:translate-x-[8px] active:translate-y-[8px]"
+              className="w-full relative group overflow-hidden rounded-lg p-0 border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[4px] hover:translate-y-[4px] transition-all active:shadow-none active:translate-x-[8px] active:translate-y-[8px]"
               style={{ imageRendering: 'pixelated' }}
             >
               <div className="absolute inset-0 bg-gradient-to-br from-yellow-300 via-orange-400 to-pink-500 animate-pulse"></div>

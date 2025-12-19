@@ -860,7 +860,7 @@ const MyQR: React.FC = () => {
                     <h3 className="text-base font-black theme-text-primary">
                       {selectedQR.type === 'gift_redemption' ? 'Gift Details' : selectedQR.type === 'stamp_redemption' ? 'Reward Details' : 'Order Items'}
                     </h3>
-                    {(selectedQR.status === 'active' || selectedQR.status === 'partial') && (
+                    {/* {(selectedQR.status === 'active' || selectedQR.status === 'partial') && (
                       <button
                         onClick={handleStaffScanClick}
                         className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl text-xs font-bold hover:scale-105 transition-transform shadow-lg"
@@ -868,7 +868,7 @@ const MyQR: React.FC = () => {
                         <QrCode className="w-4 h-4" />
                         Staff Scan
                       </button>
-                    )}
+                    )} */}
                   </div>
                   <div className="space-y-2 max-h-64 overflow-y-auto">
                     {(selectedQR.items || []).map((item: OrderItem, itemIndex: number) => {

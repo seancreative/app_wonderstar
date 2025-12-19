@@ -28,22 +28,20 @@ const AIGeniusHero: React.FC = () => {
             <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md rounded-full px-4 py-2 border border-white/20 shadow-lg">
               <button
                 onClick={() => setLanguage('en')}
-                className={`px-3 py-1 rounded-full text-sm font-bold transition-all ${
-                  language === 'en'
+                className={`px-3 py-1 rounded-full text-sm font-bold transition-all ${language === 'en'
                     ? 'bg-white text-purple-900 shadow-lg'
                     : 'text-white/70 hover:text-white'
-                }`}
+                  }`}
               >
                 EN
               </button>
               <span className="text-white/40">|</span>
               <button
                 onClick={() => setLanguage('bm')}
-                className={`px-3 py-1 rounded-full text-sm font-bold transition-all ${
-                  language === 'bm'
+                className={`px-3 py-1 rounded-full text-sm font-bold transition-all ${language === 'bm'
                     ? 'bg-white text-purple-900 shadow-lg'
                     : 'text-white/70 hover:text-white'
-                }`}
+                  }`}
               >
                 BM
               </button>
@@ -58,13 +56,20 @@ const AIGeniusHero: React.FC = () => {
             />
           </div>
 
-         
+
 
           <div className="max-w-3xl mx-auto bg-white/10 backdrop-blur-md rounded-3xl p-8 border border-white/20 shadow-2xl">
             <p className="text-white text-lg leading-relaxed">
               {t(aiGeniusTranslations.hero.description)}
             </p>
           </div>
+
+          <a
+            href="https://aigeniusworkshop.test/gallery"
+            className="inline-flex items-center gap-2 px-8 py-7 bg-white/10 backdrop-blur-md rounded-full border border-white/20 hover:bg-white/20 transition-all cursor-pointer hover:scale-105 shadow-xl"
+          >
+            <span className="text-white font-bold text-2xl">ACCESS WITH A CODE</span>
+          </a>
 
           <div className="bg-gradient-to-r from-yellow-400/20 via-orange-400/20 to-pink-400/20 backdrop-blur-md rounded-2xl p-6 border border-yellow-400/30">
             <div className="flex items-start gap-3">

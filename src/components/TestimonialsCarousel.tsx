@@ -69,19 +69,7 @@ const TestimonialsCarousel: React.FC = () => {
             <ChevronRight className="w-6 h-6" />
           </button>
 
-          <div className="flex justify-center gap-2 mt-8">
-            {testimonials.map((_, index) => (
-              <button
-                key={index}
-                onClick={() => setCurrentIndex(index)}
-                className={`w-3 h-3 rounded-full transition-all ${
-                  index === currentIndex
-                    ? 'bg-purple-600 w-8'
-                    : 'bg-purple-200 hover:bg-purple-400'
-                }`}
-              />
-            ))}
-          </div>
+
         </div>
       </div>
     </div>
