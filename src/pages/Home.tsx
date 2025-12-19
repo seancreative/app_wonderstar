@@ -29,23 +29,12 @@ const Home: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  console.log('[Home] User from AuthContext:', {
-    id: user?.id,
-    name: user?.name,
-    email: user?.email
-  });
-
   const { balances, loading: balancesLoading } = useMasterBalances({
     userId: user?.id || null,
     userEmail: user?.email || null
   });
 
-  console.log('[Home] Balances from useMasterBalances:', {
-    wBalance: balances?.wBalance,
-    bonus: balances?.bonusBalance,
-    stars: balances?.starsBalance,
-    loading: balancesLoading
-  });
+
 
   const { currentTier, lifetimeTopups } = useStars();
   const [currentSlide, setCurrentSlide] = useState(0);

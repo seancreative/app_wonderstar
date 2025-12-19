@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
-import { CheckCircle, Star, QrCode, Calendar, Package } from 'lucide-react';
+import { CheckCircle, Star, QrCode, Calendar, Package, Sparkles } from 'lucide-react';
 import { useStars } from '../hooks/useStars';
 import { useAuth } from '../contexts/AuthContext';
 import { wpayService, WPayProfile } from '../services/wpayService';
@@ -22,6 +22,7 @@ interface Order {
   tier_discount_amount?: number;
   tier_discount_pct?: number;
   stamps_earned?: number;
+  metadata?: any;
 }
 
 const OrderSuccess: React.FC = () => {
@@ -145,7 +146,7 @@ const OrderSuccess: React.FC = () => {
     <div className="min-h-screen pb-28 bg-gradient-to-b from-green-50 via-primary-50 to-white">
       <PageHeader />
 
-      <div className="max-w-md mx-auto px-4 pt-8 space-y-6">
+      <div className="max-w-md mx-auto px-4 pt-28 space-y-6">
         <div className="text-center animate-pop-in">
           <div className="inline-flex items-center justify-center w-20 h-20 bg-green-500 rounded-full mb-4 animate-bounce-soft">
             <CheckCircle className="w-12 h-12 text-white" />
@@ -256,6 +257,23 @@ const OrderSuccess: React.FC = () => {
               View QR Code
             </button>
           )}
+
+          {/* Workshop Code Display */}
+          {order.metadata?.workshop_code && (
+            <div className="bg-gradient-to-r from-orange-50 to-orange-100 p-4 rounded-xl border-dashed border-2 border-orange-300 animate-slide-up mt-4">
+              <div className="text-center space-y-2">
+                <div className="flex items-center justify-center gap-2">
+                  <Sparkles className="w-4 h-4 text-orange-600" />
+                  <h3 className="text-xs font-bold text-orange-800 uppercase tracking-wider">Workshop Access Code</h3>
+                </div>
+                <div className="p-3 bg-white rounded-xl border border-orange-200 shadow-sm">
+                  <p className="text-2xl font-black text-orange-600 tracking-widest leading-none my-1">{order.metadata.workshop_code}</p>
+                </div>
+                <p className="text-[10px] text-orange-700 font-medium">Use this code to login at the AIGenius Kiosk</p>
+              </div>
+            </div>
+          )}
+
         </div>
 
         <div className="glass p-4 rounded-2xl space-y-3 animate-slide-up" style={{ animationDelay: '0.3s' }}>

@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CheckCircle2, XCircle, Loader2, AlertCircle, QrCode, Star, ArrowRight, Wallet, Home } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { API_ENDPOINTS } from '../config/api';
 import { fiuuService } from '../services/fiuuService';
 import { activityTimelineService } from '../services/activityTimelineService';
 import { updateWalletTransactionStatus, verifyWalletTransactionStatus } from '../services/walletStatusUpdateService';
@@ -26,6 +27,7 @@ const PaymentCallback: React.FC = () => {
   const [orderDetails, setOrderDetails] = useState<any>(null);
   const [confettiFired, setConfettiFired] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+  const [workshopCode, setWorkshopCode] = useState<string | null>(null);
   const hasVerified = useRef(false);
   const isProcessing = useRef(false);
   const MAX_RETRIES = 10;
@@ -718,7 +720,7 @@ const PaymentCallback: React.FC = () => {
         // Check if order already has QR code (webhook might have generated it)
         const { data: existingOrder } = await supabase
           .from('shop_orders')
-          .select('qr_code, status, payment_status')
+          .select('qr_code, status, payment_status, items')
           .eq('id', paymentTx.shop_order_id)
           .maybeSingle();
 
@@ -733,8 +735,40 @@ const PaymentCallback: React.FC = () => {
 
         // Generate QR code only if it doesn't exist
         if (!qrCode) {
-          qrCode = `WP-${paymentTx.shop_order_id}-${Date.now()}`;
-          console.log('[Payment Success] Generating QR code:', qrCode);
+          // Check if this is a workshop order (contains workshop products)
+          const isWorkshopOrder = existingOrder?.items?.some((item: any) => {
+            const name = item.product_name?.toLowerCase() || '';
+            const cat = item.metadata?.category?.toLowerCase() || '';
+            const metaName = item.metadata?.product_name?.toLowerCase() || '';
+            return name.includes('workshop') ||
+              name.includes('genius') ||
+              cat.includes('education') ||
+              cat.includes('genius') ||
+              cat.includes('ai') ||
+              metaName.includes('workshop');
+          });
+
+          if (isWorkshopOrder) {
+            console.log('[Payment Success] Workshop order detected, generating collection number...');
+            // Fetch current count of workshop orders to generate running number
+            const { count, error: countError } = await supabase
+              .from('shop_orders')
+              .select('*', { count: 'exact', head: true })
+              .like('qr_code', 'WS-%');
+
+            if (countError) {
+              console.error('[Payment Success] Failed to count workshop orders:', countError);
+              // Fallback to timestamp if count fails
+              qrCode = `WS-${Date.now().toString().slice(-6)}`;
+            } else {
+              const nextNum = (count || 0) + 1;
+              qrCode = `WS-${nextNum.toString().padStart(4, '0')}`;
+            }
+            console.log('[Payment Success] Generated Workshop Collection Code:', qrCode);
+          } else {
+            qrCode = `WP-${paymentTx.shop_order_id}-${Date.now()}`;
+            console.log('[Payment Success] Generating Standard QR code:', qrCode);
+          }
         } else {
           console.log('[Payment Success] QR code already exists:', qrCode);
         }
@@ -765,6 +799,115 @@ const PaymentCallback: React.FC = () => {
         if (orderData) {
           setOrderDetails(orderData);
           console.log('[Payment Success] Order confirmed with QR code:', qrCode);
+
+          // SYNC WITH WORKSHOP API
+          // Check if detected as workshop order earlir (needs recalculation or store in state, but simpler to check qr_code or items again)
+          // We can check if qr_code starts with 'WS-'
+          const isWorkshopOrder = qrCode?.startsWith('WS-') || false;
+
+          if (isWorkshopOrder || (orderData.metadata && orderData.metadata.participants && orderData.metadata.participants.length > 0)) {
+            console.log('[Payment Success] Syncing with Workshop API...');
+
+            // Resolve customer details safely (user might be null in callback)
+            let customerEmail = user?.email;
+            let customerName = user?.name;
+            let customerPhone = user?.phone;
+
+            if (!customerEmail && paymentTx.user_id) {
+              const { data: uData } = await supabase
+                .from('users')
+                .select('email, name, phone')
+                .eq('id', paymentTx.user_id)
+                .maybeSingle();
+
+              if (uData) {
+                customerEmail = uData.email;
+                customerName = uData.name;
+                customerPhone = uData.phone;
+              }
+            }
+
+            try {
+              let participants = orderData.metadata?.participants || [];
+
+              // If no participants in metadata, fetch from child_profiles using paymentTx.user_id
+              if (participants.length === 0 && paymentTx.user_id) {
+                console.log('[Payment Success] No participants in metadata, fetching from profile...');
+                const { data: childData } = await supabase
+                  .from('child_profiles')
+                  .select('*')
+                  .eq('user_id', paymentTx.user_id);
+
+                if (childData && childData.length > 0) {
+                  participants = childData.map((child: any) => ({
+                    name: child.name,
+                    nric: child.mykid_number || null,
+                    gender: child.gender || 'Male',
+                    dob: child.birth_date || null
+                  }));
+                  console.log('[Payment Success] Fetched children from profile:', participants);
+                }
+              }
+
+              const payload = {
+                email: customerEmail,
+                package_type: 'Standard', // Default package
+                items: orderData.items,
+                parent_details: {
+                  name: customerName,
+                  phone: customerPhone
+                },
+                collection_code: qrCode, // Use the generated running number
+                children: participants
+              };
+
+              console.log('[Payment Success] Workshop Payload:', payload);
+
+              fetch(API_ENDPOINTS.WORKSHOP_GENERATE_CODE, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Accept': 'application/json'
+                },
+                body: JSON.stringify(payload)
+              })
+                .then(async res => {
+                  if (!res.ok) {
+                    const text = await res.text();
+                    console.error('[Payment Success] Workshop Sync Error Response:', res.status, text);
+                    try {
+                      return JSON.parse(text); // Try to parse as JSON to handle gracefully if possible
+                    } catch (e) {
+                      throw new Error(`Workshop API Error: ${res.status} ${text.substring(0, 100)}`);
+                    }
+                  }
+                  return res.json();
+                })
+                .then(async data => {
+                  console.log('[Payment Success] Workshop Sync Response:', data);
+                  if (data.success && data.code) {
+                    setWorkshopCode(data.code);
+                    // Update shop_orders metadata to persist the code
+                    await supabase.from('shop_orders').update({
+                      metadata: {
+                        ...orderData.metadata,
+                        workshop_code: data.code
+                      }
+                    }).eq('id', orderData.id);
+                    // alert("Workshop Account Synced! Use code: " + data.code);
+                  } else {
+                    console.error("Workshop Sync Error response:", data);
+                  }
+                })
+                .catch(err => {
+                  console.error('[Payment Success] Workshop Sync Failed:', err);
+                  // alert("Workshop Sync Failed. Please contact support. Error: " + err.message);
+                });
+
+            } catch (err) {
+              console.error('[Payment Success] Workshop Sync Error:', err);
+            }
+          }
 
           try {
             if (orderData.stars_earned && orderData.stars_earned > 0) {
@@ -892,7 +1035,7 @@ const PaymentCallback: React.FC = () => {
   // Payment verification uses URL params, not user session
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-primary-50 to-white flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-b from-primary-50 to-white flex items-center justify-center p-4 pt-28 pb-20">
       <div className="w-full max-w-md">
         <div className="glass-strong rounded-3xl p-8 text-center space-y-6">
           {status === 'loading' && (
@@ -966,6 +1109,18 @@ const PaymentCallback: React.FC = () => {
                       Order #{orderDetails.order_number}
                     </p>
                   </div>
+
+                  {workshopCode && (
+                    <div className="bg-gradient-to-r from-orange-50 to-orange-100 p-4 rounded-2xl border-2 border-orange-200 animate-slide-up">
+                      <div className="text-center space-y-2">
+                        <h3 className="text-sm font-bold text-orange-800 uppercase tracking-wider">AIGenius Workshop Code</h3>
+                        <div className="p-3 bg-white rounded-xl border border-orange-200 shadow-inner">
+                          <p className="text-3xl font-black text-orange-600 tracking-widest">{workshopCode}</p>
+                        </div>
+                        <p className="text-xs text-orange-700 font-medium">Use this code to login at the workshop kiosk</p>
+                      </div>
+                    </div>
+                  )}
 
                   {orderDetails.items && orderDetails.items.length > 0 && (
                     <div className="bg-white/60 p-3 rounded-xl space-y-2">

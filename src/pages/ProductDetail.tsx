@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Plus, Minus, Star, ShoppingCart, Sparkles } from 'lucide-react';
+import { ArrowLeft, Plus, Minus, Star, ShoppingCart, Sparkles, AlertCircle, UserPlus, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useShop } from '../contexts/ShopContext';
@@ -46,6 +46,22 @@ const ProductDetail: React.FC = () => {
   const [loading, setLoading] = useState(!location.state?.product);
   const [addingToCart, setAddingToCart] = useState(false);
   const [showToast, setShowToast] = useState(false);
+  const [hasChildren, setHasChildren] = useState<boolean | null>(null);
+  const [showChildModal, setShowChildModal] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      supabase
+        .from('child_profiles')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .then(({ count, error }) => {
+          if (!error) {
+            setHasChildren(count !== null && count > 0);
+          }
+        });
+    }
+  }, [user]);
 
   useEffect(() => {
     if (!product && productId) {
@@ -78,6 +94,13 @@ const ProductDetail: React.FC = () => {
 
   const handleAddToCart = async () => {
     if (!product || !selectedOutlet || !user) return;
+
+    // Check for Workshop/Education requirements
+    const isEdu = isFromWorkshop || product.name.toLowerCase().includes('genius') || product.name.toLowerCase().includes('workshop') || product.category.toLowerCase().includes('education');
+    if (isEdu && hasChildren === false) {
+      setShowChildModal(true);
+      return;
+    }
 
     setAddingToCart(true);
     try {
@@ -149,15 +172,14 @@ const ProductDetail: React.FC = () => {
   const images = product.images && product.images.length > 0
     ? product.images
     : product.image_url
-    ? [product.image_url]
-    : [];
+      ? [product.image_url]
+      : [];
 
   return (
     <div className="min-h-screen pb-44 bg-gradient-to-b from-primary-50 to-white">
       {/* Page Header - Fixed */}
-      <div className={`fixed top-0 left-0 right-0 z-40 glass border-b border-white/20 backdrop-blur-2xl max-w-md mx-auto ${
-        isFromWorkshop ? 'bg-gradient-to-r from-yellow-100/90 via-orange-100/90 to-pink-100/90' : ''
-      }`}>
+      <div className={`fixed top-0 left-0 right-0 z-40 glass border-b border-white/20 backdrop-blur-2xl max-w-md mx-auto ${isFromWorkshop ? 'bg-gradient-to-r from-yellow-100/90 via-orange-100/90 to-pink-100/90' : ''
+        }`}>
         <div className="px-4 py-3 flex items-center gap-3">
           <button
             onClick={() => navigate(isFromWorkshop ? '/edu' : `/shop/${outletSlug}`)}
@@ -344,6 +366,49 @@ const ProductDetail: React.FC = () => {
           onClose={() => setShowToast(false)}
         />
       )}
+      {/* Child Requirement Modal */}
+      {showChildModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl animate-pop-in relative">
+            <button
+              onClick={() => setShowChildModal(false)}
+              className="absolute top-4 right-4 p-2 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors"
+            >
+              <X className="w-5 h-5 text-gray-500" />
+            </button>
+
+            <div className="text-center space-y-4 pt-2">
+              <div className="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                <UserPlus className="w-10 h-10 text-orange-600" />
+              </div>
+
+              <div>
+                <h3 className="text-xl font-black text-gray-900 mb-2">Child Profile Required</h3>
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  To book this workshop, we need participant details. Please add a child to your profile first.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-3 pt-2">
+                <button
+                  onClick={() => navigate('/add-child')}
+                  className="w-full py-3.5 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-xl font-bold shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                >
+                  <UserPlus className="w-5 h-5" />
+                  Add Child Profile
+                </button>
+                <button
+                  onClick={() => setShowChildModal(false)}
+                  className="w-full py-3 bg-gray-50 text-gray-700 rounded-xl font-bold hover:bg-gray-100 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

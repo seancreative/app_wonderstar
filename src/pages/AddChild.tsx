@@ -174,11 +174,10 @@ const AddChild: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setChildData(prev => ({ ...prev, gender: 'male' }))}
-                    className={`flex-1 px-6 py-4 rounded-xl font-bold transition-all flex items-center justify-center gap-3 ${
-                      childData.gender === 'male'
+                    className={`flex-1 px-6 py-4 rounded-xl font-bold transition-all flex items-center justify-center gap-3 ${childData.gender === 'male'
                         ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg scale-105'
                         : 'glass-light border-2 border-gray-200 theme-text-secondary hover:border-blue-300 hover:scale-105'
-                    }`}
+                      }`}
                   >
                     <User className="w-6 h-6" />
                     Male
@@ -186,11 +185,10 @@ const AddChild: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setChildData(prev => ({ ...prev, gender: 'female' }))}
-                    className={`flex-1 px-6 py-4 rounded-xl font-bold transition-all flex items-center justify-center gap-3 ${
-                      childData.gender === 'female'
+                    className={`flex-1 px-6 py-4 rounded-xl font-bold transition-all flex items-center justify-center gap-3 ${childData.gender === 'female'
                         ? 'bg-gradient-to-r from-pink-500 to-pink-600 text-white shadow-lg scale-105'
                         : 'glass-light border-2 border-gray-200 theme-text-secondary hover:border-pink-300 hover:scale-105'
-                    }`}
+                      }`}
                   >
                     <User className="w-6 h-6" />
                     Female
@@ -311,9 +309,8 @@ const AddChild: React.FC = () => {
                   <Calendar className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
                 </div>
                 {childData.dateOfBirth && age !== null && (
-                  <p className={`text-sm font-medium mt-3 flex items-center gap-1 ${
-                    isOver12 ? 'text-red-600' : 'theme-text-secondary'
-                  }`}>
+                  <p className={`text-sm font-medium mt-3 flex items-center gap-1 ${isOver12 ? 'text-red-600' : 'theme-text-secondary'
+                    }`}>
                     <Sparkles className={`w-4 h-4 ${isOver12 ? 'text-red-600' : 'text-primary-600'}`} />
                     <span className={`font-bold ${isOver12 ? 'text-red-600' : 'text-primary-600'}`}>Age: {age} years old</span>
                   </p>
@@ -381,11 +378,10 @@ const AddChild: React.FC = () => {
                       key={category.id}
                       type="button"
                       onClick={() => toggleWorkshopInterest(category.id)}
-                      className={`p-4 rounded-xl transition-all flex flex-col items-center gap-2 ${
-                        isSelected
+                      className={`p-4 rounded-xl transition-all flex flex-col items-center gap-2 ${isSelected
                           ? 'bg-gradient-to-br from-primary-500 to-primary-600 text-white shadow-lg scale-105'
                           : 'glass-light border-2 border-gray-200 theme-text-secondary hover:border-primary-300 hover:scale-105'
-                      }`}
+                        }`}
                     >
                       <Icon className="w-8 h-8" />
                       <span className="text-xs font-bold text-center leading-tight">{category.name}</span>
@@ -416,11 +412,10 @@ const AddChild: React.FC = () => {
                   key={tier.id}
                   type="button"
                   onClick={() => setChildData(prev => ({ ...prev, budgetTier: tier.id as any }))}
-                  className={`w-full p-5 rounded-2xl transition-all flex items-center gap-4 ${
-                    childData.budgetTier === tier.id
+                  className={`w-full p-5 rounded-2xl transition-all flex items-center gap-4 ${childData.budgetTier === tier.id
                       ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-glow scale-105'
                       : 'glass border-2 border-gray-200 hover:border-primary-300 hover:scale-105'
-                  }`}
+                    }`}
                 >
                   <div className={`text-3xl ${childData.budgetTier === tier.id ? '' : 'opacity-60'}`}>
                     {tier.icon}
@@ -587,7 +582,7 @@ const AddChild: React.FC = () => {
   return (
     <div className="min-h-screen pb-28">
       <PageHeader />
-      <div className="max-w-md mx-auto px-6 pt-6 space-y-6">
+      <div className="max-w-md mx-auto px-6 pt-28 space-y-6">
         {step < 7 && (
           <div className="flex items-center justify-between mb-4">
             {step > 1 && (

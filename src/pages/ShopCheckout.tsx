@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Star, Wallet, CreditCard, Smartphone, Check, ChevronRight, Ticket, X, Plus, AlertCircle, Trophy, MapPin, Store, Loader2, Gift, Sparkles } from 'lucide-react';
+import { ArrowLeft, Star, Wallet, CreditCard, Smartphone, Check, ChevronRight, Ticket, X, Plus, AlertCircle, Trophy, MapPin, Store, Loader2, Gift, Sparkles, Users, UserPlus } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useShop } from '../contexts/ShopContext';
@@ -12,6 +12,7 @@ import { useVouchers } from '../hooks/useVouchers';
 import { fiuuService } from '../services/fiuuService';
 import { wpayService } from '../services/wpayService';
 import { activityTimelineService } from '../services/activityTimelineService';
+import { API_ENDPOINTS } from '../config/api';
 import PageHeader from '../components/Layout/PageHeader';
 import BottomNav from '../components/Layout/BottomNav';
 import VoucherBanner from '../components/VoucherBanner';
@@ -69,6 +70,37 @@ const ShopCheckout: React.FC = () => {
   const [autoApplied, setAutoApplied] = useState(false);
   const [productMapping, setProductMapping] = useState<Map<string, string>>(new Map());
   const [isCompletingOrder, setIsCompletingOrder] = useState(false);
+  // Workshop Participants State
+  const [profileChildren, setProfileChildren] = useState<any[]>([]);
+  const [loadingChildren, setLoadingChildren] = useState(false);
+  const [selectedChildIds, setSelectedChildIds] = useState<string[]>([]); // Track selected IDs to prevent duplicates if needed, or just map indices
+
+  useEffect(() => {
+    if (user) {
+      setLoadingChildren(true);
+      supabase
+        .from('child_profiles')
+        .select('*')
+        .eq('user_id', user.id)
+        .then(({ data, error }) => {
+          if (!error && data) {
+            setProfileChildren(data);
+          }
+          setLoadingChildren(false);
+        });
+    }
+  }, [user]);
+
+  // Derived participants based on selection
+  const participants = selectedChildIds.map(id => {
+    const child = profileChildren.find(c => c.id === id);
+    return child ? {
+      name: child.name,
+      gender: child.gender || 'male',
+      nric: child.nric || child.mykid_number || '', // Handle varied column names
+      child_id: child.id
+    } : null;
+  }).filter(Boolean);
 
   useEffect(() => {
     if (user) {
@@ -570,7 +602,8 @@ const ShopCheckout: React.FC = () => {
         payment_status: 'pending',
         fnbstatus: 'preparing',
         metadata: {
-          bonus_discount_amount: appliedBonusAmount || 0
+          bonus_discount_amount: appliedBonusAmount || 0,
+          participants: participants
         }
       };
 
@@ -797,10 +830,43 @@ const ShopCheckout: React.FC = () => {
 
     try {
       const orderNumber = `WP${Date.now().toString().slice(-8)}`;
-      const qrCode = `WP-${Date.now()}-${user.id.substring(0, 8)}`;
+      let qrCode = `WP-${Date.now()}-${user.id.substring(0, 8)}`;
 
       // Build order items with detailed discount tracking
       let orderItems = buildOrderItemsWithDiscounts();
+
+      console.log('[ShopCheckout] Items to check:', JSON.stringify(orderItems, null, 2));
+
+      // Check for Workshop Items
+      const isWorkshopOrder = orderItems.some((item: any) => {
+        const name = item.product_name?.toLowerCase() || '';
+        const cat = item.metadata?.category?.toLowerCase() || '';
+        const metaName = item.metadata?.product_name?.toLowerCase() || '';
+
+        const isMatch = name.includes('workshop') ||
+          name.includes('genius') ||
+          cat.includes('education') ||
+          cat.includes('genius') ||
+          cat.includes('ai') ||
+          metaName.includes('workshop');
+
+        console.log(`[ShopCheckout] Checking Item: ${name} (Category: ${cat}) -> Match: ${isMatch}`);
+        return isMatch;
+      });
+
+      if (isWorkshopOrder) {
+        console.log('[ShopCheckout] Workshop order detected, generating collection number...');
+        const { count, error: countError } = await supabase
+          .from('shop_orders')
+          .select('*', { count: 'exact', head: true })
+          .like('qr_code', 'WS-%');
+
+        if (!countError) {
+          const nextNum = (count || 0) + 1;
+          qrCode = `WS-${nextNum.toString().padStart(4, '0')}`;
+          console.log('[ShopCheckout] Generated Workshop Code:', qrCode);
+        }
+      }
 
       // Add free gift item if free_gift voucher is applied
       if (selectedVoucher && (selectedVoucher.voucher || selectedVoucher).voucher_type === 'free_gift') {
@@ -1056,6 +1122,81 @@ const ShopCheckout: React.FC = () => {
 
       if (clearCartError) {
         console.error('Failed to clear cart:', clearCartError);
+      }
+
+      // SYNC WITH WORKSHOP API
+      if (isWorkshopOrder) {
+        console.log('[ShopCheckout] Syncing with Workshop API...');
+
+        // Resolve customer details
+        const customerEmail = user.email;
+        const customerName = user.name;
+        const customerPhone = user.phone;
+
+        try {
+          let participants = orderData.metadata.participants || [];
+
+          // If no participants in metadata, fetch from child_profiles
+          if (participants.length === 0 && user?.id) {
+            console.log('[ShopCheckout] No participants in metadata, fetching from profile...');
+            const { data: childData } = await supabase
+              .from('child_profiles')
+              .select('*')
+              .eq('user_id', user.id);
+
+            if (childData && childData.length > 0) {
+              participants = childData.map(child => ({
+                name: child.name,
+                nric: child.mykid_number || null, // Map mykid_number to nric
+                gender: child.gender || 'Male', // Default or map if available
+                dob: child.birth_date || null
+                // Add other fields if necessary
+              }));
+              console.log('[ShopCheckout] Fetched children from profile:', participants);
+            }
+          }
+
+          const payload = {
+            email: customerEmail,
+            package_type: 'Standard',
+            items: orderItems,
+            parent_details: {
+              name: customerName,
+              phone: customerPhone
+            },
+            collection_code: qrCode,
+            children: participants
+          };
+
+          console.log('[ShopCheckout] URL:', API_ENDPOINTS.WORKSHOP_GENERATE_CODE);
+          console.log('[ShopCheckout] Workshop Payload:', payload);
+
+          // Await the fetch to prevent navigation from cancelling it
+          await fetch(API_ENDPOINTS.WORKSHOP_GENERATE_CODE, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify(payload)
+          })
+            .then(async res => {
+              console.log('[ShopCheckout] Workshop Response Status:', res.status);
+              if (!res.ok) {
+                const text = await res.text();
+                console.error('[ShopCheckout] Workshop Sync Error:', res.status, text);
+              } else {
+                const data = await res.json();
+                console.log('[ShopCheckout] Workshop Sync Success:', data);
+              }
+            })
+            .catch(err => console.error('[ShopCheckout] Workshop Sync Exception:', err));
+
+          console.log('[ShopCheckout] Workshop Sync Process Finished');
+
+        } catch (syncError) {
+          console.error('[ShopCheckout] Error preparing workshop sync:', syncError);
+        }
       }
 
       await refreshCartCount();
@@ -1619,6 +1760,81 @@ const ShopCheckout: React.FC = () => {
           </div>
         </button>
 
+        {/* Workshop Participant Selector (Profile-Based) */}
+        {cartItems.some(item => {
+          const name = item.metadata?.product_name?.toLowerCase() || '';
+          const cat = item.metadata?.category?.toLowerCase() || '';
+          return name.includes('genius') || name.includes('workshop') || cat.includes('education');
+        }) && (
+            <div className={`p-4 rounded-2xl space-y-4 ${profileChildren.length === 0 ? 'bg-red-50 border border-red-200' : 'glass'}`}>
+              <h3 className="font-bold text-gray-900 text-base flex items-center gap-2">
+                <Users className="w-5 h-5 text-indigo-600" />
+                Select Participants
+              </h3>
+
+              {loadingChildren ? (
+                <div className="flex items-center gap-2 text-gray-500 text-sm">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Loading profiles...
+                </div>
+              ) : profileChildren.length === 0 ? (
+                <div className="text-center space-y-3 py-2">
+                  <div className="p-3 bg-red-100 rounded-full w-12 h-12 flex items-center justify-center mx-auto">
+                    <UserPlus className="w-6 h-6 text-red-600" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-red-700">No Children Found</p>
+                    <p className="text-sm text-red-600">You must add your children to your profile before purchasing a workshop ticket.</p>
+                  </div>
+                  <button
+                    onClick={() => navigate('/add-child')}
+                    className="w-full py-2 bg-red-600 text-white rounded-xl font-bold text-sm shadow-lg hover:bg-red-700 transition-colors"
+                  >
+                    Go to Profile & Add Child
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <p className="text-xs text-gray-600 -mt-2">Select which child profile(s) this ticket is for.</p>
+
+                  {selectedChildIds.map((selectedId, idx) => (
+                    <div key={idx} className="flex gap-2">
+                      <select
+                        className="w-full p-3 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                        value={selectedId}
+                        onChange={e => {
+                          const newIds = [...selectedChildIds];
+                          newIds[idx] = e.target.value;
+                          setSelectedChildIds(newIds);
+                        }}
+                      >
+                        <option value="">-- Select Child --</option>
+                        {profileChildren.map(child => (
+                          <option key={child.id} value={child.id}>
+                            {child.name} ({child.age ? `${child.age}yo` : 'N/A'})
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() => setSelectedChildIds(selectedChildIds.filter((_, i) => i !== idx))}
+                        className="p-3 text-red-500 hover:bg-red-50 rounded-xl"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                  ))}
+
+                  <button
+                    onClick={() => setSelectedChildIds([...selectedChildIds, ''])}
+                    className="w-full py-3 border-2 border-dashed border-indigo-200 text-indigo-600 rounded-xl font-bold text-sm hover:bg-indigo-50 transition-all flex items-center justify-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Add Participant Slot</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
         <div className="glass p-4 rounded-2xl space-y-3">
           <h3 className="font-bold text-gray-900 text-base">Payment Method</h3>
 
@@ -1764,12 +1980,16 @@ const ShopCheckout: React.FC = () => {
               onClick={() => navigate(`/shop/${outletSlug}`)}
               className="flex-1 py-3.5 bg-white border-2 border-primary-500 text-primary-600 rounded-xl font-bold text-base hover:bg-primary-50 active:scale-95 transition-all flex items-center justify-center gap-2"
             >
-              <ArrowLeft className="w-4 h-4" />
+              <ChevronRight className="w-4 h-4" />
               <span>Shop More</span>
             </button>
             <button
               onClick={handlePayNow}
-              disabled={processing}
+              disabled={processing || (cartItems.some(item => {
+                const name = item.metadata?.product_name?.toLowerCase() || '';
+                const cat = item.metadata?.category?.toLowerCase() || '';
+                return name.includes('genius') || name.includes('workshop') || cat.includes('education');
+              }) && (profileChildren.length === 0 || selectedChildIds.length === 0 || selectedChildIds.some(id => !id)))}
               className={`flex-[1.5] py-3.5 text-white rounded-xl font-bold text-base hover:scale-105 active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2 ${calculateTotal() === 0
                 ? 'bg-gradient-to-r from-green-500 to-emerald-600'
                 : 'gradient-primary'

@@ -113,7 +113,7 @@ const Profile: React.FC = () => {
                   <p className="text-base sm:text-lg font-black text-yellow-900 break-all leading-none">{(balances?.starsBalance || 0).toLocaleString()}</p>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              {/* <div className="grid grid-cols-2 gap-3">
                 <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-3 border border-blue-200">
                   <p className="text-xs font-bold text-blue-700 mb-1">Lifetime Topups</p>
                   <p className="text-lg font-black text-blue-900">RM{(balances?.lifetimeTopup || 0).toFixed(2)}</p>
@@ -122,7 +122,7 @@ const Profile: React.FC = () => {
                   <p className="text-xs font-bold text-gray-700 mb-1">Total Transactions</p>
                   <p className="text-lg font-black text-gray-900">{balances?.totalTransactions || 0}</p>
                 </div>
-              </div>
+              </div> */}
               <button
                 onClick={() => navigate('/wallet')}
                 className="w-full mt-4 py-3 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl font-bold hover:scale-105 active:scale-95 transition-all shadow-lg"

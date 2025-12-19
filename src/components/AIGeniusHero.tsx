@@ -1,7 +1,7 @@
 import React from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { aiGeniusTranslations } from '../translations/aiGenius';
-import { Sparkles, Zap } from 'lucide-react';
+import { Sparkles, Zap, ArrowRight } from 'lucide-react';
 
 const AIGeniusHero: React.FC = () => {
   const { language, setLanguage, t } = useLanguage();
@@ -29,8 +29,8 @@ const AIGeniusHero: React.FC = () => {
               <button
                 onClick={() => setLanguage('en')}
                 className={`px-3 py-1 rounded-full text-sm font-bold transition-all ${language === 'en'
-                    ? 'bg-white text-purple-900 shadow-lg'
-                    : 'text-white/70 hover:text-white'
+                  ? 'bg-white text-purple-900 shadow-lg'
+                  : 'text-white/70 hover:text-white'
                   }`}
               >
                 EN
@@ -39,8 +39,8 @@ const AIGeniusHero: React.FC = () => {
               <button
                 onClick={() => setLanguage('bm')}
                 className={`px-3 py-1 rounded-full text-sm font-bold transition-all ${language === 'bm'
-                    ? 'bg-white text-purple-900 shadow-lg'
-                    : 'text-white/70 hover:text-white'
+                  ? 'bg-white text-purple-900 shadow-lg'
+                  : 'text-white/70 hover:text-white'
                   }`}
               >
                 BM
@@ -65,10 +65,14 @@ const AIGeniusHero: React.FC = () => {
           </div>
 
           <a
-            href="https://aigeniusworkshop.test/gallery"
-            className="inline-flex items-center gap-2 px-8 py-7 bg-white/10 backdrop-blur-md rounded-full border border-white/20 hover:bg-white/20 transition-all cursor-pointer hover:scale-105 shadow-xl"
+            href="https://aigeniusworkshop.test/view"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group w-full flex items-center justify-center gap-3 px-8 py-5 bg-gradient-to-r from-cyan-500 via-teal-500 to-emerald-500 rounded-2xl shadow-[0_0_20px_rgba(45,212,191,0.3)] border border-cyan-400/30 hover:shadow-[0_0_30px_rgba(45,212,191,0.6)] hover:scale-[1.02] transition-all duration-300 cursor-pointer relative overflow-hidden"
           >
-            <span className="text-white font-bold text-2xl">ACCESS WITH A CODE</span>
+            <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
+            <span className="text-white font-black text-xl tracking-wider uppercase drop-shadow-md">ACCESS WITH A CODE</span>
+            <ArrowRight className="w-6 h-6 text-white group-hover:translate-x-1 transition-transform" />
           </a>
 
           <div className="bg-gradient-to-r from-yellow-400/20 via-orange-400/20 to-pink-400/20 backdrop-blur-md rounded-2xl p-6 border border-yellow-400/30">

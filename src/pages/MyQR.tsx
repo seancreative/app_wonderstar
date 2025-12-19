@@ -514,15 +514,14 @@ const MyQR: React.FC = () => {
           className="w-full p-3 hover:bg-gray-50 transition-all"
         >
           <div className="flex items-start gap-2.5">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-              qr.type === 'gift_redemption'
-                ? 'bg-pink-50'
-                : qr.type === 'stamp_redemption'
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${qr.type === 'gift_redemption'
+              ? 'bg-pink-50'
+              : qr.type === 'stamp_redemption'
                 ? 'bg-amber-50'
                 : qr.type === 'wallet_topup'
-                ? 'bg-green-50'
-                : 'bg-blue-50'
-            }`}>
+                  ? 'bg-green-50'
+                  : 'bg-blue-50'
+              }`}>
               {qr.type === 'gift_redemption' ? (
                 <Gift className="w-5 h-5 text-pink-600" />
               ) : qr.type === 'stamp_redemption' ? (
@@ -672,31 +671,28 @@ const MyQR: React.FC = () => {
         <div className="grid grid-cols-3 gap-2 p-1 bg-gray-100 rounded-2xl">
           <button
             onClick={() => setActiveTab('latest')}
-            className={`py-2.5 px-3 rounded-xl font-bold text-sm transition-all ${
-              activeTab === 'latest'
-                ? 'bg-white text-purple-600 shadow-md'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
+            className={`py-2.5 px-3 rounded-xl font-bold text-sm transition-all ${activeTab === 'latest'
+              ? 'bg-white text-purple-600 shadow-md'
+              : 'text-gray-600 hover:text-gray-900'
+              }`}
           >
             Latest
           </button>
           <button
             onClick={() => setActiveTab('pending')}
-            className={`py-2.5 px-3 rounded-xl font-bold text-sm transition-all ${
-              activeTab === 'pending'
-                ? 'bg-white text-orange-600 shadow-md'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
+            className={`py-2.5 px-3 rounded-xl font-bold text-sm transition-all ${activeTab === 'pending'
+              ? 'bg-white text-orange-600 shadow-md'
+              : 'text-gray-600 hover:text-gray-900'
+              }`}
           >
             Pending
           </button>
           <button
             onClick={() => setActiveTab('completed')}
-            className={`py-2.5 px-3 rounded-xl font-bold text-sm transition-all ${
-              activeTab === 'completed'
-                ? 'bg-white text-green-600 shadow-md'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
+            className={`py-2.5 px-3 rounded-xl font-bold text-sm transition-all ${activeTab === 'completed'
+              ? 'bg-white text-green-600 shadow-md'
+              : 'text-gray-600 hover:text-gray-900'
+              }`}
           >
             Completed
           </button>
@@ -875,27 +871,30 @@ const MyQR: React.FC = () => {
                       const redemption = selectedQR.redemptions?.find((r: ItemRedemption) => r.item_index === itemIndex);
                       const isRedeemed = redemption?.status === 'completed';
 
-                      // Extract last 4 digits of order number for F&B items
-                      const collectionNumber = selectedQR.type === 'order' && selectedQR.metadata?.order_number
-                        ? selectedQR.metadata.order_number.slice(-4)
-                        : null;
+                      // Extract collection number (last 4 digits) OR workshop code
+                      let collectionDisplay = null;
+                      let collectionLabel = 'Collection#';
+
+                      if (selectedQR.qrCode.startsWith('WS-')) {
+                        collectionDisplay = selectedQR.qrCode.replace('WS-', '');
+                        collectionLabel = 'Workshop Code';
+                      } else if (selectedQR.type === 'order' && selectedQR.metadata?.order_number) {
+                        collectionDisplay = selectedQR.metadata.order_number.slice(-4);
+                      }
 
                       return (
                         <div
                           key={itemIndex}
-                          className={`flex items-start gap-3 p-3 rounded-xl transition-all ${
-                            isRedeemed ? 'bg-green-50 border-2 border-green-200' : 'bg-gray-50 border-2 border-gray-200'
-                          }`}
+                          className={`flex items-start gap-3 p-3 rounded-xl transition-all ${isRedeemed ? 'bg-green-50 border-2 border-green-200' : 'bg-gray-50 border-2 border-gray-200'
+                            }`}
                         >
-                          <div className={`w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5 ${
-                            isRedeemed ? 'bg-green-500' : 'bg-gray-300'
-                          }`}>
+                          <div className={`w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5 ${isRedeemed ? 'bg-green-500' : 'bg-gray-300'
+                            }`}>
                             {isRedeemed && <CheckCircle className="w-4 h-4 text-white" />}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className={`text-sm font-bold ${
-                              isRedeemed ? 'text-green-900' : 'theme-text-primary'
-                            }`}>
+                            <p className={`text-sm font-bold ${isRedeemed ? 'text-green-900' : 'theme-text-primary'
+                              }`}>
                               {item.product_name}
                             </p>
                             <p className="text-xs theme-text-secondary font-medium">
@@ -912,10 +911,12 @@ const MyQR: React.FC = () => {
                               </p>
                             )}
                           </div>
-                          {collectionNumber && (
+                          {collectionDisplay && (
                             <div className="flex flex-col items-center justify-center flex-shrink-0">
-                              <p className="text-[10px] font-bold text-gray-500 leading-tight">Collection#</p>
-                              <p className="text-lg font-black text-gray-900 leading-tight">{collectionNumber}</p>
+                              <p className="text-[10px] font-bold text-gray-500 leading-tight">{collectionLabel}</p>
+                              <p className={`font-black text-gray-900 leading-tight ${collectionLabel === 'Workshop Code' ? 'text-sm' : 'text-lg'}`}>
+                                {collectionDisplay}
+                              </p>
                             </div>
                           )}
                         </div>

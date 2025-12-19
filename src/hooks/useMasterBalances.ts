@@ -24,13 +24,15 @@ export function useMasterBalances({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
-  // Track if already fetched to prevent duplicate calls
-  const hasFetchedRef = useRef(false);
+  // Track last fetched params to prevent duplicate calls/loops
+  const lastFetchedParamsRef = useRef<string>('');
 
   const loadBalances = useCallback(async (force = false) => {
-    // Only fetch once unless forced (manual refresh)
-    if (hasFetchedRef.current && !force) {
-      console.log('[useMasterBalances] Already fetched, skipping...');
+    const currentParams = JSON.stringify({ userId, userEmail, dateFilter });
+
+    // Skip if already fetched with same params, unless forced
+    if (lastFetchedParamsRef.current === currentParams && !force) {
+      console.log('[useMasterBalances] Already fetched for these params, skipping...');
       return;
     }
 
@@ -40,6 +42,7 @@ export function useMasterBalances({
       console.log('[useMasterBalances] No userId provided, setting balances to null');
       setBalances(null);
       setLoading(false);
+      lastFetchedParamsRef.current = currentParams; // Mark as handled
       return;
     }
 
@@ -74,7 +77,7 @@ export function useMasterBalances({
             });
 
             setBalances(wpayBalances);
-            hasFetchedRef.current = true;
+            lastFetchedParamsRef.current = currentParams; // Mark success
             setLoading(false);
             return;
           } else {
@@ -95,20 +98,24 @@ export function useMasterBalances({
         stars: result.starsBalance
       });
       setBalances(result);
-      hasFetchedRef.current = true;
+      lastFetchedParamsRef.current = currentParams; // Mark success
     } catch (err) {
       console.error('[useMasterBalances] Error:', err);
       setError(err instanceof Error ? err : new Error('Unknown error'));
+      // Do NOT update lastFetchedParamsRef on error so it can retry? 
+      // Or update it to prevent loop on persistent error? 
+      // Better to NOT update so it retries if dependencies change/re-mount. 
+      // But if loop connects to error, we might want to back off.
+      // For now, assume error allows retry.
     } finally {
       setLoading(false);
     }
   }, [userId, userEmail, dateFilter]);
 
-  // Only fetch ONCE on initial mount
+  // Only fetch when dependencies check logic permits
   useEffect(() => {
-    hasFetchedRef.current = false; // Reset when deps change
     loadBalances();
-  }, [userId, userEmail, dateFilter]);
+  }, [loadBalances]);
 
   // Manual refresh function (for use after payments, etc.)
   const manualRefresh = useCallback(async () => {
