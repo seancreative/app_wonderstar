@@ -197,21 +197,7 @@ export const useStars = () => {
     }
   }, [user, loadStarsFromWPay]);
 
-  // Auto-refresh when page becomes visible
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && user) {
-        console.log('[useStars] Page visible, refreshing stars data');
-        loadStarsFromWPay(true);
-      }
-    };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [user, loadStarsFromWPay]);
 
   const earnStars = async (amount: number, source: string, metadata: Record<string, any> = {}) => {
     if (!user) {

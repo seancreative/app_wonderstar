@@ -367,6 +367,7 @@ const ShopCheckout: React.FC = () => {
         product_name: item.metadata.product_name,
         quantity: item.quantity,
         unit_price: item.unit_price,
+        visit_date: item.visit_date,
         item_discount_amount: totalItemDiscount,
         item_discount_type: voucherDiscountForItem > 0 ? 'voucher' : tierDiscountForItem > 0 ? 'tier' : 'none',
         voucher_discount_amount: voucherDiscountForItem,
@@ -753,7 +754,90 @@ const ShopCheckout: React.FC = () => {
     }
   };
 
-  const handlePayNow = () => {
+
+  const checkWorkshopEnrollment = async (): Promise<boolean> => {
+    if (!user) return true;
+
+    // Filter for workshop items in cart
+    const workshopItems = cartItems.filter(item => {
+      const name = item.metadata?.product_name?.toLowerCase() || '';
+      const cat = item.metadata?.category?.toLowerCase() || '';
+      return name.includes('workshop') || name.includes('genius') || cat.includes('education');
+    });
+
+    if (workshopItems.length === 0) return true; // No workshop items, safe to proceed
+
+    setProcessing(true);
+    try {
+      // Fetch profile with visitors and active themes
+      const response = await fetch(`${API_ENDPOINTS.WORKSHOP_CHECK_PROFILE}?email=${encodeURIComponent(user.email)}`);
+
+      if (!response.ok) {
+        console.warn('Failed to check workshop profile, skipping check');
+        return true;
+      }
+
+      const data = await response.json();
+      if (!data.exists || !data.profile || !data.profile.visitors) {
+        return true; // No profile or visitors found, safe to proceed
+      }
+
+      const existingVisitors = data.profile.visitors;
+      const conflicts: string[] = [];
+
+      // Check each workshop item
+      for (const item of workshopItems) {
+        const visitDate = item.visit_date || item.metadata?.visit_date || item.metadata?.selected_date;
+        if (!visitDate) continue;
+
+        const targetDate = new Date(visitDate).toISOString().split('T')[0];
+
+        // Check each selected participant against existing visitors
+        for (const participant of participants) {
+          if (!participant) continue;
+
+          const isEnrolled = existingVisitors.some((visitor: any) => {
+            // Check if visitor matches (by Name or NRIC)
+            const nameMatch = visitor.name?.toLowerCase() === participant.name?.toLowerCase();
+            // Check if theme matches date
+            const themeStartDate = visitor.theme?.start_date; // Assuming theme loaded
+
+            if (nameMatch && themeStartDate) {
+              // Check if dates overlap or match
+              // Simple string match for date
+              return themeStartDate === targetDate;
+            }
+            return false;
+          });
+
+          if (isEnrolled) {
+            conflicts.push(`${participant.name} is already enrolled in workshop on ${targetDate}`);
+          }
+        }
+      }
+
+      if (conflicts.length > 0) {
+        setErrorMessage(`Enrollment Conflict:\n${conflicts.join('\n')}`);
+        setShowErrorModal(true);
+        return false;
+      }
+
+      return true;
+
+    } catch (error) {
+      console.error('Error checking workshop enrollment:', error);
+      // Fail open or closed? Fail open for now
+      return true;
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handlePayNow = async () => {
+    // Check workshop enrollment first
+    const safeToProceed = await checkWorkshopEnrollment();
+    if (!safeToProceed) return;
+
     const total = calculateTotal();
 
     console.log('[ShopCheckout] handlePayNow - Balance check:', {

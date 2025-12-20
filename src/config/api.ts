@@ -22,6 +22,7 @@ export const API_ENDPOINTS = {
 
     // Workshop API
     WORKSHOP_GENERATE_CODE: 'https://art.aigenius.com.my/api/generate-code',
+    WORKSHOP_CHECK_PROFILE: 'https://art.aigenius.com.my/api/check-profile',
 } as const;
 
 export default { API_BASE_URL, API_ENDPOINTS };
