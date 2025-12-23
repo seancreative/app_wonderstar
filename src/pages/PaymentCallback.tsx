@@ -750,20 +750,36 @@ const PaymentCallback: React.FC = () => {
 
           if (isWorkshopOrder) {
             console.log('[Payment Success] Workshop order detected, generating collection number...');
-            // Fetch current count of workshop orders to generate running number
-            const { count, error: countError } = await supabase
-              .from('shop_orders')
-              .select('*', { count: 'exact', head: true })
-              .like('qr_code', 'WS-%');
+            // Generate 5-character randomized mixed letters and numbers
+            let isUnique = false;
+            let randomCode = '';
 
-            if (countError) {
-              console.error('[Payment Success] Failed to count workshop orders:', countError);
-              // Fallback to timestamp if count fails
-              qrCode = `WS-${Date.now().toString().slice(-6)}`;
-            } else {
-              const nextNum = (count || 0) + 1;
-              qrCode = `WS-${nextNum.toString().padStart(4, '0')}`;
+            // Safety counter to prevent infinite loops
+            let attempts = 0;
+            while (!isUnique && attempts < 5) {
+              randomCode = Array(5).fill(0).map(() =>
+                'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'[Math.floor(Math.random() * 36)]
+              ).join('');
+
+              // Check if code exists
+              const { data } = await supabase
+                .from('shop_orders')
+                .select('id')
+                .eq('qr_code', `WS-${randomCode}`)
+                .maybeSingle();
+
+              if (!data) {
+                isUnique = true;
+              }
+              attempts++;
             }
+
+            // Fallback if loop fails (unlikely)
+            if (!isUnique) {
+              randomCode = Date.now().toString().slice(-5);
+            }
+
+            qrCode = `WS-${randomCode}`;
             console.log('[Payment Success] Generated Workshop Collection Code:', qrCode);
           } else {
             qrCode = `WP-${paymentTx.shop_order_id}-${Date.now()}`;

@@ -164,15 +164,14 @@ const Welcome: React.FC = () => {
                 return (
                   <div
                     key={index}
-                    className={`absolute transition-all duration-700 ease-in-out ${
-                      isActive
+                    className={`absolute transition-all duration-700 ease-in-out ${isActive
                         ? 'opacity-100 scale-100 translate-x-0'
                         : isPrev
-                        ? 'opacity-0 scale-75 -translate-x-full'
-                        : isNext
-                        ? 'opacity-0 scale-75 translate-x-full'
-                        : 'opacity-0 scale-50'
-                    }`}
+                          ? 'opacity-0 scale-75 -translate-x-full'
+                          : isNext
+                            ? 'opacity-0 scale-75 translate-x-full'
+                            : 'opacity-0 scale-50'
+                      }`}
                   >
                     <div className="flex items-center gap-4 px-4">
                       <Icon className="w-10 h-10 text-white drop-shadow-lg flex-shrink-0" />
@@ -190,11 +189,10 @@ const Welcome: React.FC = () => {
                 <button
                   key={index}
                   onClick={() => setCurrentSlide(index)}
-                  className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                    index === currentSlide
+                  className={`w-2 h-2 rounded-full transition-all duration-300 ${index === currentSlide
                       ? 'bg-white w-6 shadow-lg'
                       : 'bg-white/40 hover:bg-white/60'
-                  }`}
+                    }`}
                   aria-label={`Go to slide ${index + 1}`}
                 />
               ))}
@@ -268,13 +266,7 @@ const Welcome: React.FC = () => {
         </form>
 
         <div className="text-center space-y-2">
-          <button
-            onClick={() => setShowVersionModal(true)}
-            className="text-white font-semibold hover:underline hover:text-pink-300 transition-colors"
-          >
-            Built V{currentVersion}
-          </button>
-          <a href="https://www.craveasia.com/" target="_blank" rel="noopener noreferrer" className="text-white font-semibold hover:underline hover:text-pink-300 transition-colors"> | Powered by CRAVE</a>
+          <a href="https://www.craveasia.com/" target="_blank" rel="noopener noreferrer" className="text-white font-semibold hover:underline hover:text-pink-300 transition-colors">Powered by CRAVE</a>
         </div>
       </div>
 
