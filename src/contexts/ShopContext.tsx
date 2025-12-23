@@ -51,7 +51,13 @@ export const ShopProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   useEffect(() => {
     if (user) {
-      loadUserPreferences();
+      // Defer preferences loading to reduce initial API calls
+      const loadDeferred = () => loadUserPreferences();
+      if (typeof requestIdleCallback !== 'undefined') {
+        requestIdleCallback(loadDeferred, { timeout: 2000 });
+      } else {
+        setTimeout(loadDeferred, 100);
+      }
     } else {
       setPreferencesLoaded(true);
     }

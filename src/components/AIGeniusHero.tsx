@@ -65,7 +65,7 @@ const AIGeniusHero: React.FC = () => {
           </div>
 
           <a
-            href="https://aigeniusworkshop.test/view"
+            href="https://art.aigenius.com.my/view"
             target="_blank"
             rel="noopener noreferrer"
             className="group w-full flex items-center justify-center gap-3 px-8 py-5 bg-gradient-to-r from-cyan-500 via-teal-500 to-emerald-500 rounded-2xl shadow-[0_0_20px_rgba(45,212,191,0.3)] border border-cyan-400/30 hover:shadow-[0_0_30px_rgba(45,212,191,0.6)] hover:scale-[1.02] transition-all duration-300 cursor-pointer relative overflow-hidden"

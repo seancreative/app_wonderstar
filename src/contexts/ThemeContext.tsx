@@ -15,27 +15,36 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    // Load user session from Supabase Auth
-    const loadUserAndTheme = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+    // Defer theme loading to after initial render to reduce initial API calls
+    const loadThemeDeferred = () => {
+      const loadUserAndTheme = async () => {
+        const { data: { session } } = await supabase.auth.getSession();
 
-      if (session?.user) {
-        // User is logged in, load theme from database
-        const { data: userData } = await supabase
-          .from('users')
-          .select('id')
-          .eq('auth_id', session.user.id)
-          .maybeSingle();
+        if (session?.user) {
+          // User is logged in, load theme from database
+          const { data: userData } = await supabase
+            .from('users')
+            .select('id')
+            .eq('auth_id', session.user.id)
+            .maybeSingle();
 
-        if (userData?.id) {
-          setUserId(userData.id);
-          loadThemeFromDatabase(userData.id);
+          if (userData?.id) {
+            setUserId(userData.id);
+            loadThemeFromDatabase(userData.id);
+          }
         }
-      }
-      // For anonymous users, use default theme (no localStorage)
+        // For anonymous users, use default theme (no localStorage)
+      };
+
+      loadUserAndTheme();
     };
 
-    loadUserAndTheme();
+    // Use requestIdleCallback if available, otherwise setTimeout
+    if (typeof requestIdleCallback !== 'undefined') {
+      requestIdleCallback(loadThemeDeferred, { timeout: 2000 });
+    } else {
+      setTimeout(loadThemeDeferred, 100);
+    }
   }, []);
 
   useEffect(() => {

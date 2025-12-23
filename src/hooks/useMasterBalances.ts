@@ -6,6 +6,7 @@ interface UseMasterBalancesOptions {
   userId: string | null;
   userEmail?: string | null;
   dateFilter?: string;
+  enabled?: boolean; // If false, don't auto-fetch on mount
 }
 
 interface UseMasterBalancesReturn {
@@ -19,9 +20,10 @@ export function useMasterBalances({
   userId,
   userEmail,
   dateFilter,
+  enabled = true, // Default to true for backward compatibility
 }: UseMasterBalancesOptions): UseMasterBalancesReturn {
   const [balances, setBalances] = useState<MasterBalances | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(enabled); // Only show loading if enabled
   const [error, setError] = useState<Error | null>(null);
 
   // Track last fetched params to prevent duplicate calls/loops
@@ -112,10 +114,14 @@ export function useMasterBalances({
     }
   }, [userId, userEmail, dateFilter]);
 
-  // Only fetch when dependencies check logic permits
+  // Only fetch when enabled and dependencies check logic permits
   useEffect(() => {
-    loadBalances();
-  }, [loadBalances]);
+    if (enabled) {
+      loadBalances();
+    } else {
+      setLoading(false);
+    }
+  }, [loadBalances, enabled]);
 
   // Manual refresh function (for use after payments, etc.)
   const manualRefresh = useCallback(async () => {

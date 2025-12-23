@@ -14,7 +14,7 @@ const PageHeader: React.FC<PageHeaderProps> = ({ variant = 'fixed', className = 
   const navigate = useNavigate();
   const { user } = useAuth();
   const { selectedOutlet, cartCount, getCartOutlet, setSelectedOutlet } = useShop();
-  const { currentTier } = useStars();
+  const { currentTier } = useStars({ enabled: false }); // Don't auto-fetch on every page, use cached data
   const [prevCartCount, setPrevCartCount] = useState(cartCount);
   const [isShaking, setIsShaking] = useState(false);
   const [showStarburst, setShowStarburst] = useState(false);

@@ -5,7 +5,8 @@ import { supabase } from '../lib/supabase';
 import { activityTimelineService } from '../services/activityTimelineService';
 import type { StarsTransaction, MembershipTier } from '../types/database';
 
-export const useStars = () => {
+export const useStars = (options: { enabled?: boolean } = {}) => {
+  const { enabled = true } = options;
   const { user } = useAuth();
   const [starsBalance, setStarsBalance] = useState(0);
   const [transactions, setTransactions] = useState<StarsTransaction[]>([]);
@@ -13,7 +14,7 @@ export const useStars = () => {
   const [nextTier, setNextTier] = useState<MembershipTier | null>(null);
   const [lifetimeTopups, setLifetimeTopups] = useState(0);
   const [previousTierName, setPreviousTierName] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(enabled);
   const hasFetchedRef = useRef(false);
 
   const loadStarsFromWPay = useCallback(async (force = false) => {
@@ -192,10 +193,12 @@ export const useStars = () => {
   };
 
   useEffect(() => {
-    if (user) {
+    if (user && enabled) {
       loadStarsFromWPay();
+    } else if (!enabled) {
+      setLoading(false);
     }
-  }, [user, loadStarsFromWPay]);
+  }, [user, loadStarsFromWPay, enabled]);
 
 
 
