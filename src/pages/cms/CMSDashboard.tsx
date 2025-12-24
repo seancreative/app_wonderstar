@@ -102,7 +102,7 @@ const CMSDashboard: React.FC = () => {
       ] = await Promise.all([
         supabase
           .from('shop_orders')
-          .select('total_amount, created_at'),
+          .select('total_amount, created_at, payment_type'),
         supabase
           .from('users')
           .select('id, created_at'),
@@ -132,8 +132,11 @@ const CMSDashboard: React.FC = () => {
       const stars = starsResult.data || [];
       const redemptions = redemptionsResult.data || [];
 
-      const totalRevenue = orders.reduce((sum, order) => sum + parseFloat(order.total_amount || 0), 0);
-      const todayRevenue = orders
+      // Filter for Real Revenue (payment_type = 'payment') to match CMS Orders & Financial
+      const paymentOrders = orders.filter(o => o.payment_type === 'payment');
+
+      const totalRevenue = paymentOrders.reduce((sum, order) => sum + parseFloat(order.total_amount || 0), 0);
+      const todayRevenue = paymentOrders
         .filter(order => new Date(order.created_at) >= today)
         .reduce((sum, order) => sum + parseFloat(order.total_amount || 0), 0);
 
@@ -362,15 +365,14 @@ const CMSDashboard: React.FC = () => {
               <button
                 onClick={handleSync}
                 disabled={syncing}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-bold text-white transition-all shadow-md hover:shadow-lg ${
-                  syncing
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-bold text-white transition-all shadow-md hover:shadow-lg ${syncing
                     ? 'bg-gray-400 cursor-not-allowed'
                     : syncSuccess === true
-                    ? 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700'
-                    : syncSuccess === false
-                    ? 'bg-gradient-to-r from-red-500 to-rose-600'
-                    : 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700'
-                }`}
+                      ? 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700'
+                      : syncSuccess === false
+                        ? 'bg-gradient-to-r from-red-500 to-rose-600'
+                        : 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700'
+                  }`}
               >
                 {syncing ? (
                   <>

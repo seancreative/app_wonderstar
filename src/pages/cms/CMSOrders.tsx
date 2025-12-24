@@ -23,7 +23,9 @@ import {
   Sparkles,
   Info,
   Star,
-  Receipt
+  Receipt,
+  Trash2,
+  AlertTriangle
 } from 'lucide-react';
 import QRCodeDisplay from '../../components/QRCodeDisplay';
 import ReceiptModal from '../../components/ReceiptModal';
@@ -65,23 +67,23 @@ const CMSOrders: React.FC = () => {
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [receiptOrderId, setReceiptOrderId] = useState<string | null>(null);
   const [orders, setOrders] = useState<OrderWithDetails[]>([]);
+  const [outlets, setOutlets] = useState<{ id: string; name: string; location?: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [paymentStatusFilter, setPaymentStatusFilter] = useState<string>('all');
   const [paymentTypeFilter, setPaymentTypeFilter] = useState<string>('all');
+  const [outletFilter, setOutletFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState({ start: '', end: '' });
   const [selectedOrder, setSelectedOrder] = useState<OrderWithDetails | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
-  const [showCancelModal, setShowCancelModal] = useState(false);
-  const [showRefundModal, setShowRefundModal] = useState(false);
-  const [cancelReason, setCancelReason] = useState('');
-  const [cancelNotes, setCancelNotes] = useState('');
-  const [refundReason, setRefundReason] = useState('');
-  const [refundNotes, setRefundNotes] = useState('');
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  // Bulk selection
+  const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
+    loadOutlets();
     loadOrders();
 
     // Subscribe to real-time changes on order_item_redemptions
@@ -104,7 +106,21 @@ const CMSOrders: React.FC = () => {
     return () => {
       supabase.removeChannel(redemptionChannel);
     };
-  }, [statusFilter, paymentStatusFilter, paymentTypeFilter]);
+  }, [statusFilter, paymentStatusFilter, paymentTypeFilter, outletFilter]);
+
+  const loadOutlets = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('outlets')
+        .select('id, name, location')
+        .order('name');
+      if (!error && data) {
+        setOutlets(data);
+      }
+    } catch (error) {
+      console.error('Error loading outlets:', error);
+    }
+  };
 
   const loadOrders = async () => {
     try {
@@ -138,6 +154,10 @@ const CMSOrders: React.FC = () => {
 
       if (paymentTypeFilter !== 'all') {
         query = query.eq('payment_type', paymentTypeFilter);
+      }
+
+      if (outletFilter !== 'all') {
+        query = query.eq('outlet_id', outletFilter);
       }
 
       const { data: ordersData, error: ordersError } = await query;
@@ -289,6 +309,115 @@ const CMSOrders: React.FC = () => {
       toast.error(`Failed to update order status: ${errorMessage}${errorDetails}${errorHint}`);
     } finally {
       setUpdatingStatus(false);
+    }
+  };
+
+  const deleteOrder = async (orderId: string) => {
+    if (!window.confirm('Are you sure you want to delete this order? This action cannot be undone and will also delete all related redemptions.')) {
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      // First delete related order_item_redemptions
+      await supabase
+        .from('order_item_redemptions')
+        .delete()
+        .eq('order_id', orderId);
+
+      // Then delete the order
+      const { error } = await supabase
+        .from('shop_orders')
+        .delete()
+        .eq('id', orderId);
+
+      if (error) {
+        throw error;
+      }
+
+      toast.success('Order deleted successfully');
+      await loadOrders();
+
+      // Close modal if the deleted order was selected
+      if (selectedOrder?.id === orderId) {
+        setShowDetailModal(false);
+        setSelectedOrder(null);
+      }
+    } catch (err: any) {
+      console.error('Error deleting order:', err);
+      toast.error(`Failed to delete order: ${err?.message || 'Unknown error'}`);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  // Bulk selection functions
+  const toggleOrderSelection = (orderId: string) => {
+    setSelectedOrderIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(orderId)) {
+        newSet.delete(orderId);
+      } else {
+        newSet.add(orderId);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedOrderIds.size === filteredOrders.length) {
+      // Deselect all
+      setSelectedOrderIds(new Set());
+    } else {
+      // Select all filtered orders
+      setSelectedOrderIds(new Set(filteredOrders.map(o => o.id)));
+    }
+  };
+
+  const bulkDeleteOrders = async () => {
+    if (selectedOrderIds.size === 0) {
+      toast.error('No orders selected');
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to delete ${selectedOrderIds.size} order(s)? This action cannot be undone and will delete all related redemptions.`)) {
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      const orderIdsArray = Array.from(selectedOrderIds);
+
+      // First delete related order_item_redemptions
+      await supabase
+        .from('order_item_redemptions')
+        .delete()
+        .in('order_id', orderIdsArray);
+
+      // Then delete the orders
+      const { error } = await supabase
+        .from('shop_orders')
+        .delete()
+        .in('id', orderIdsArray);
+
+      if (error) {
+        throw error;
+      }
+
+      toast.success(`${selectedOrderIds.size} order(s) deleted successfully`);
+      setSelectedOrderIds(new Set());
+      await loadOrders();
+
+      // Close modal if the deleted order was selected
+      if (selectedOrder && selectedOrderIds.has(selectedOrder.id)) {
+        setShowDetailModal(false);
+        setSelectedOrder(null);
+      }
+    } catch (err: any) {
+      console.error('Error deleting orders:', err);
+      toast.error(`Failed to delete orders: ${err?.message || 'Unknown error'}`);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -620,43 +749,39 @@ const CMSOrders: React.FC = () => {
             <div className="flex gap-2">
               <button
                 onClick={() => setPaymentTypeFilter('all')}
-                className={`px-4 py-2 rounded-xl font-bold transition-all ${
-                  paymentTypeFilter === 'all'
-                    ? 'bg-gray-900 text-white shadow-lg'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
+                className={`px-4 py-2 rounded-xl font-bold transition-all ${paymentTypeFilter === 'all'
+                  ? 'bg-gray-900 text-white shadow-lg'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
               >
                 All Orders
               </button>
               <button
                 onClick={() => setPaymentTypeFilter('payment')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all ${
-                  paymentTypeFilter === 'payment'
-                    ? 'bg-green-600 text-white shadow-lg'
-                    : 'bg-green-100 text-green-700 hover:bg-green-200'
-                }`}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all ${paymentTypeFilter === 'payment'
+                  ? 'bg-green-600 text-white shadow-lg'
+                  : 'bg-green-100 text-green-700 hover:bg-green-200'
+                  }`}
               >
                 <CreditCard className="w-4 h-4" />
                 Payments
               </button>
               <button
                 onClick={() => setPaymentTypeFilter('deduction')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all ${
-                  paymentTypeFilter === 'deduction'
-                    ? 'bg-blue-600 text-white shadow-lg'
-                    : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                }`}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all ${paymentTypeFilter === 'deduction'
+                  ? 'bg-blue-600 text-white shadow-lg'
+                  : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                  }`}
               >
                 <Wallet className="w-4 h-4" />
                 Deductions
               </button>
               <button
                 onClick={() => setPaymentTypeFilter('redemption')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all ${
-                  paymentTypeFilter === 'redemption'
-                    ? 'bg-purple-600 text-white shadow-lg'
-                    : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
-                }`}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all ${paymentTypeFilter === 'redemption'
+                  ? 'bg-purple-600 text-white shadow-lg'
+                  : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+                  }`}
               >
                 <Gift className="w-4 h-4" />
                 Redemptions
@@ -707,6 +832,20 @@ const CMSOrders: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-2">
+              <MapPin className="w-5 h-5 text-gray-500" />
+              <select
+                value={outletFilter}
+                onChange={(e) => setOutletFilter(e.target.value)}
+                className="px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:outline-none font-bold"
+              >
+                <option value="all">All Outlets</option>
+                {outlets.map((outlet) => (
+                  <option key={outlet.id} value={outlet.id}>{outlet.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2">
               <Calendar className="w-5 h-5 text-gray-500" />
               <input
                 type="date"
@@ -725,11 +864,46 @@ const CMSOrders: React.FC = () => {
           </div>
         </div>
 
+        {/* Bulk Delete Bar */}
+        {selectedOrderIds.size > 0 && (
+          <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="font-bold text-red-700">
+                {selectedOrderIds.size} order(s) selected
+              </span>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setSelectedOrderIds(new Set())}
+                className="px-4 py-2 bg-white border-2 border-gray-300 text-gray-700 rounded-lg font-bold hover:bg-gray-50 transition-colors"
+              >
+                Clear Selection
+              </button>
+              <button
+                onClick={bulkDeleteOrders}
+                disabled={deleting}
+                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700 transition-colors disabled:opacity-50"
+              >
+                <Trash2 className="w-4 h-4" />
+                {deleting ? 'Deleting...' : `Delete ${selectedOrderIds.size} Order(s)`}
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="w-12 px-4 py-4">
+                    <input
+                      type="checkbox"
+                      checked={filteredOrders.length > 0 && selectedOrderIds.size === filteredOrders.length}
+                      onChange={toggleSelectAll}
+                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                    />
+                  </th>
                   <th className="text-left px-4 py-4 text-xs font-bold text-gray-900 uppercase">Order</th>
                   <th className="text-left px-4 py-4 text-xs font-bold text-gray-900 uppercase">Date</th>
                   <th className="text-left px-4 py-4 text-xs font-bold text-gray-900 uppercase">Customer</th>
@@ -737,24 +911,23 @@ const CMSOrders: React.FC = () => {
                   <th className="text-left px-4 py-4 text-xs font-bold text-gray-900 uppercase">Items</th>
                   <th className="text-right px-4 py-4 text-xs font-bold text-gray-900 uppercase">Gross Sales</th>
                   <th className="text-right px-4 py-4 text-xs font-bold text-red-600 uppercase">
-                    <div className="flex items-center justify-end gap-1" title="Discount from Vouchers">
+                    <div className="flex items-center justify-end gap-1">
                       Disc. Voucher
                     </div>
                   </th>
                   <th className="text-right px-4 py-4 text-xs font-bold text-orange-600 uppercase">
-                    <div className="flex items-center justify-end gap-1" title="Discount from Bonus Balance">
+                    <div className="flex items-center justify-end gap-1">
                       Disc. Bonus
                     </div>
                   </th>
                   <th className="text-right px-4 py-4 text-xs font-bold text-blue-600 uppercase">
-                    <div className="flex items-center justify-end gap-1" title="Other Discounts (Tier/Permanent)">
+                    <div className="flex items-center justify-end gap-1">
                       Disc. Others
                     </div>
                   </th>
                   <th className="text-right px-4 py-4 text-xs font-bold text-green-700 uppercase">
                     <div className="flex items-center justify-end gap-1">
                       Total Paid
-                      <Info className="w-3 h-3 cursor-help" title="Payment method shown below" />
                     </div>
                   </th>
                   <th className="text-left px-4 py-4 text-xs font-bold text-gray-900 uppercase">Payment Status</th>
@@ -765,7 +938,7 @@ const CMSOrders: React.FC = () => {
               <tbody>
                 {filteredOrders.length === 0 ? (
                   <tr>
-                    <td colSpan={13} className="px-6 py-12 text-center">
+                    <td colSpan={14} className="px-6 py-12 text-center">
                       <ShoppingBag className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                       <p className="text-gray-600 font-medium">No orders found</p>
                       <p className="text-sm text-gray-500 mt-1">Orders will appear here when customers place them</p>
@@ -784,12 +957,20 @@ const CMSOrders: React.FC = () => {
                     return (
                       <tr
                         key={order.id}
-                        className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
+                        className={`border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${selectedOrderIds.has(order.id) ? 'bg-blue-50' : ''}`}
                         onClick={() => {
                           setSelectedOrder(order);
                           setShowDetailModal(true);
                         }}
                       >
+                        <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={selectedOrderIds.has(order.id)}
+                            onChange={() => toggleOrderSelection(order.id)}
+                            className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                          />
+                        </td>
                         <td className="px-4 py-4">
                           <div className="flex flex-col gap-1">
                             <OrderNumberLink
@@ -900,6 +1081,17 @@ const CMSOrders: React.FC = () => {
                               title="View Details"
                             >
                               <Eye className="w-4 h-4 text-blue-600" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteOrder(order.id);
+                              }}
+                              className="p-2 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Delete Order"
+                              disabled={deleting}
+                            >
+                              <Trash2 className="w-4 h-4 text-red-600" />
                             </button>
                           </div>
                         </td>
@@ -1130,9 +1322,8 @@ const CMSOrders: React.FC = () => {
                                 <Package className="w-3 h-3" />
                                 <span className="font-semibold">{redemption.redeemed_quantity}/{redemption.quantity}</span>
                               </div>
-                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold ${
-                                redemption.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
-                              }`}>
+                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold ${redemption.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
+                                }`}>
                                 {redemption.status === 'completed' ? (
                                   <>
                                     <CheckCircle className="w-3 h-3" />
@@ -1305,11 +1496,10 @@ const CMSOrders: React.FC = () => {
                         key={status}
                         onClick={() => updateOrderStatus(selectedOrder.id, status)}
                         disabled={updatingStatus || isCurrentStatus}
-                        className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all text-sm ${
-                          isCurrentStatus
-                            ? `${statusConfig.bg} ${statusConfig.text} border-2 ${statusConfig.bg.replace('bg-', 'border-')}`
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                        } ${updatingStatus ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all text-sm ${isCurrentStatus
+                          ? `${statusConfig.bg} ${statusConfig.text} border-2 ${statusConfig.bg.replace('bg-', 'border-')}`
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          } ${updatingStatus ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
                         {displayLabel}
                       </button>
