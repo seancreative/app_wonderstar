@@ -151,6 +151,68 @@ const MyQR: React.FC = () => {
     };
   }, [user]);
 
+  // Subscribe to order fnbstatus changes (real-time updates from KMS)
+  useEffect(() => {
+    if (!user) return;
+
+    console.log('[MyQR] Setting up shop_orders subscription for user:', user.id);
+
+    const ordersChannel = supabase
+      .channel('myqr_order_status_updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'shop_orders',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
+          const updatedOrder = payload.new as any;
+          const oldOrder = payload.old as any;
+
+          console.log('[MyQR] Order updated:', {
+            order_id: updatedOrder.id,
+            order_number: updatedOrder.order_number,
+            old_fnbstatus: oldOrder?.fnbstatus,
+            new_fnbstatus: updatedOrder.fnbstatus
+          });
+
+          // Check if fnbstatus changed to 'ready'
+          if (updatedOrder.fnbstatus === 'ready' && oldOrder?.fnbstatus !== 'ready') {
+            console.log('[MyQR] Order is now ready for collection!');
+
+            // Extract collection number from order_number (last 4 digits)
+            const orderNumber = updatedOrder.order_number || '';
+            const collectionNumber = orderNumber.slice(-4);
+
+            setReadyNotification({
+              collectionNumber,
+              orderNumber: collectionNumber,
+              outletName: 'WonderStars',
+              orderId: updatedOrder.id
+            });
+
+            notificationSound.playSuccess();
+
+            // Auto-dismiss after 15 seconds
+            setTimeout(() => {
+              setReadyNotification(null);
+            }, 15000);
+          }
+
+          // Refresh QR codes to update the display
+          loadQRCodes();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      console.log('[MyQR] Cleaning up shop_orders subscription');
+      supabase.removeChannel(ordersChannel);
+    };
+  }, [user]);
+
   const loadQRCodes = async () => {
     if (!user) return;
 

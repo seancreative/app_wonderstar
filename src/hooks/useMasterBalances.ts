@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { calculateMasterBalances, MasterBalances } from '../services/masterBalanceCalculator';
-import { wpayService } from '../services/wpayService';
+import { wpayCache } from '../services/wpayCache';
 
 interface UseMasterBalancesOptions {
   userId: string | null;
@@ -52,15 +52,16 @@ export function useMasterBalances({
       setLoading(true);
       setError(null);
 
-      // ========== TRY WPAY API FIRST ==========
+      // ========== TRY WPAY CACHE FIRST ==========
       if (userEmail) {
         try {
-          console.log('[useMasterBalances] Fetching from WPay API for:', userEmail);
-          const response = await wpayService.getProfile(userEmail);
+          console.log('[useMasterBalances] Getting cached profile for:', userEmail);
+          // Use cached profile (only makes API call if cache is stale)
+          const response = await wpayCache.getProfile(userEmail, force);
 
           if (response && response.wpay_status === 'success' && response.profile) {
             const wpayProfile = response.profile;
-            console.log('[useMasterBalances] Got WPay profile:', wpayProfile);
+            console.log('[useMasterBalances] Got profile:', wpayProfile, response.fromCache ? '(cached)' : '(fresh)');
 
             const wpayBalances: MasterBalances = {
               totalTransactions: 0,
@@ -72,7 +73,7 @@ export function useMasterBalances({
               calculatedAt: new Date().toISOString()
             };
 
-            console.log('[useMasterBalances] Using WPay balances:', {
+            console.log('[useMasterBalances] Using balances:', {
               wBalance: wpayBalances.wBalance,
               bonus: wpayBalances.bonusBalance,
               stars: wpayBalances.starsBalance

@@ -13,6 +13,7 @@ import {
     Gift
 } from 'lucide-react';
 import { wpayService, WPayProfile, WPayTransaction } from '../services/wpayService';
+import { wpayCache } from '../services/wpayCache';
 import { useAuth } from '../contexts/AuthContext';
 import confetti from 'canvas-confetti';
 
@@ -223,9 +224,9 @@ const WPayCallback: React.FC = () => {
                     setStatus('success');
                     setMessage('Payment completed!');
 
-                    // Try to get profile by email
+                    // Try to get profile by email (force refresh since we just completed payment)
                     if (email) {
-                        const profileResult = await wpayService.getProfile(email);
+                        const profileResult = await wpayCache.forceRefresh(email);
                         if (profileResult.profile) {
                             setProfile(profileResult.profile);
                         }

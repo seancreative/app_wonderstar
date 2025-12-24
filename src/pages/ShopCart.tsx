@@ -934,17 +934,17 @@ const ShopCart: React.FC = () => {
                   onClick={appliedBonusAmount > 0 ? handleRemoveBonus : handleApplyBonus}
                   disabled={calculateSubtotal() - calculateDiscount() <= 0}
                   className={`w-full p-3 rounded-xl border-2 transition-all text-left ${appliedBonusAmount > 0
-                      ? 'border-orange-400 bg-orange-50'
-                      : bonusBalance > 0
-                        ? 'border-dashed border-orange-300 hover:border-orange-400 hover:bg-orange-50'
-                        : 'border-dashed border-gray-300 hover:border-gray-400 hover:bg-gray-50'
+                    ? 'border-orange-400 bg-orange-50'
+                    : bonusBalance > 0
+                      ? 'border-dashed border-orange-300 hover:border-orange-400 hover:bg-orange-50'
+                      : 'border-dashed border-gray-300 hover:border-gray-400 hover:bg-gray-50'
                     } disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Gift className={`w-4 h-4 ${appliedBonusAmount > 0 || bonusBalance > 0
-                          ? 'text-orange-600'
-                          : 'text-gray-400'
+                        ? 'text-orange-600'
+                        : 'text-gray-400'
                         }`} />
                       <span className="text-sm font-bold text-gray-900">
                         {appliedBonusAmount > 0 ? 'Remove Bonus' : 'Apply Bonus Discount'}
@@ -1047,10 +1047,10 @@ const ShopCart: React.FC = () => {
                         }}
                         disabled={!canUse}
                         className={`w-full p-4 rounded-xl border-2 text-left transition-all ${isSelected
-                            ? 'border-orange-500 bg-orange-50'
-                            : canUse
-                              ? 'border-gray-200 bg-white hover:border-orange-300'
-                              : 'border-gray-200 bg-gray-50 opacity-60'
+                          ? 'border-orange-500 bg-orange-50'
+                          : canUse
+                            ? 'border-gray-200 bg-white hover:border-orange-300'
+                            : 'border-gray-200 bg-gray-50 opacity-60'
                           }`}
                       >
                         <div className="flex items-start gap-3">
@@ -1079,9 +1079,11 @@ const ShopCart: React.FC = () => {
                                 </span>
                               )}
                             </div>
-                            <p className="text-xs text-gray-500 mt-1">
-                              Uses: {userVoucher.usage_count}/{userVoucher.max_usage_count}
-                            </p>
+                            {userVoucher.max_usage_count < 99999 && (
+                              <p className="text-xs text-gray-500 mt-1">
+                                Uses: {userVoucher.usage_count}/{userVoucher.max_usage_count}
+                              </p>
+                            )}
                             {!canUse && subtotal < minPurchase && (
                               <p className="text-xs text-red-600 font-semibold mt-1">
                                 Spend RM {(minPurchase - subtotal).toFixed(2)} more to use

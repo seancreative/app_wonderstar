@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { wpayService } from '../services/wpayService';
+import { wpayCache } from '../services/wpayCache';
 import { supabase } from '../lib/supabase';
 import { activityTimelineService } from '../services/activityTimelineService';
 import type { StarsTransaction, MembershipTier } from '../types/database';
@@ -20,21 +20,22 @@ export const useStars = (options: { enabled?: boolean } = {}) => {
   const loadStarsFromWPay = useCallback(async (force = false) => {
     if (!user?.email) return;
 
-    // Only fetch once unless forced
+    // Only fetch once unless forced (cache handles TTL)
     if (hasFetchedRef.current && !force) {
-      console.log('[useStars] Already fetched, skipping...');
+      console.log('[useStars] Already fetched this session, skipping...');
       return;
     }
 
     try {
       setLoading(true);
-      console.log('[useStars] Fetching from WPay API for:', user.email);
+      console.log('[useStars] Getting profile for:', user.email);
 
-      const response = await wpayService.getProfile(user.email);
+      // Use cached profile (only makes API call if cache is stale)
+      const response = await wpayCache.getProfile(user.email, force);
 
       if (response && response.wpay_status === 'success' && response.profile) {
         const wpayProfile = response.profile;
-        console.log('[useStars] Got WPay profile:', wpayProfile);
+        console.log('[useStars] Got profile:', wpayProfile, response.fromCache ? '(cached)' : '(fresh)');
 
         // Use stars from wpay_users (source of truth)
         setStarsBalance(wpayProfile.stars || 0);

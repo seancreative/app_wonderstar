@@ -2186,9 +2186,11 @@ const ShopCheckout: React.FC = () => {
                                 </span>
                               )}
                             </div>
-                            <p className="text-xs text-gray-500 mt-1">
-                              Uses: {userVoucher.usage_count}/{userVoucher.max_usage_count}
-                            </p>
+                            {userVoucher.max_usage_count < 99999 && (
+                              <p className="text-xs text-gray-500 mt-1">
+                                Uses: {userVoucher.usage_count}/{userVoucher.max_usage_count}
+                              </p>
+                            )}
                             {!canUse && subtotal < minPurchase && (
                               <p className="text-xs text-red-600 font-semibold mt-1">
                                 Spend RM {(minPurchase - subtotal).toFixed(2)} more to use

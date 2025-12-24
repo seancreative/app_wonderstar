@@ -4,6 +4,7 @@ import { CheckCircle, Star, QrCode, Calendar, Package, Sparkles } from 'lucide-r
 import { useStars } from '../hooks/useStars';
 import { useAuth } from '../contexts/AuthContext';
 import { wpayService, WPayProfile } from '../services/wpayService';
+import { wpayCache } from '../services/wpayCache';
 import BonusSummary from '../components/BonusSummary';
 import PageHeader from '../components/Layout/PageHeader';
 import BottomNav from '../components/Layout/BottomNav';
@@ -39,7 +40,8 @@ const OrderSuccess: React.FC = () => {
 
   useEffect(() => {
     if (user?.email) {
-      wpayService.getProfile(user.email).then(res => {
+      // Use cached profile to prevent excessive API calls
+      wpayCache.getProfile(user.email).then(res => {
         if (res.profile) {
           setWpayProfile(res.profile);
         }
