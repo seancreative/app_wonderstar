@@ -64,7 +64,7 @@ export const voucherService = {
     }
   },
 
-  async redeemVoucherCode(userId: string, code: string): Promise<{ success: boolean; voucher?: UserVoucher; error?: string }> {
+  async redeemVoucherCode(userId: string, code: string): Promise<{ success: boolean; voucher?: UserVoucher; error?: string; message?: string }> {
     try {
       const { data: voucher, error: voucherError } = await supabase
         .from('vouchers')
@@ -148,8 +148,74 @@ export const voucherService = {
         .eq('voucher_id', voucher.id)
         .maybeSingle();
 
+      // Check if user already has this voucher
       if (existingUserVoucher) {
-        return { success: false, error: 'You have already redeemed this voucher' };
+        // IMPORTANT: Always use the PARENT voucher's usage_limit_per_user as the source of truth
+        // This ensures that if admin updates the voucher limit, existing users benefit from the new limit
+        const parentVoucherLimit = voucher.usage_limit_per_user || 1;
+        const storedMaxUsageCount = existingUserVoucher.max_usage_count || 1;
+        const maxUsageCount = Math.max(parentVoucherLimit, storedMaxUsageCount);
+        const currentUsageCount = existingUserVoucher.usage_count || 0;
+
+        // If the parent voucher's limit is higher than what's stored, update the user_voucher record
+        if (parentVoucherLimit > storedMaxUsageCount) {
+          await supabase
+            .from('user_vouchers')
+            .update({
+              max_usage_count: parentVoucherLimit,
+              // Also reset status to available if they have uses remaining
+              status: currentUsageCount < parentVoucherLimit ? 'available' : 'used'
+            })
+            .eq('id', existingUserVoucher.id);
+        }
+
+        // If user has remaining uses, return the existing voucher
+        if (currentUsageCount < maxUsageCount) {
+          // Voucher is still usable, return it as already available
+          const { data: fullUserVoucher } = await supabase
+            .from('user_vouchers')
+            .select(`
+              *,
+              voucher:vouchers(
+                id,
+                code,
+                title,
+                description,
+                voucher_type,
+                value,
+                free_gift_name,
+                application_scope,
+                product_application_method,
+                min_purchase,
+                max_uses,
+                times_used,
+                is_active,
+                created_date,
+                expires_at,
+                eligible_product_ids,
+                eligible_category_ids,
+                eligible_subcategory_ids,
+                restriction_type,
+                max_products_per_use,
+                is_daily_redeemable,
+                usage_limit_per_user,
+                outlet_restriction_type,
+                applicable_outlet_ids,
+                metadata
+              )
+            `)
+            .eq('id', existingUserVoucher.id)
+            .single();
+
+          return {
+            success: true,
+            voucher: fullUserVoucher as any,
+            message: `Voucher already in your wallet. You have ${maxUsageCount - currentUsageCount} uses remaining.`
+          };
+        }
+
+        // User has exhausted all uses
+        return { success: false, error: `You have already used this voucher ${currentUsageCount} time(s). Maximum ${maxUsageCount} uses allowed.` };
       }
 
       const { data: newUserVoucher, error: insertError } = await supabase
@@ -160,6 +226,7 @@ export const voucherService = {
           status: 'available',
           expires_at: voucher.expires_at,
           max_usage_count: voucher.usage_limit_per_user || 1,
+          usage_count: 0,
           metadata: {
             redemption_method: 'manual_code',
             redeemed_code: code

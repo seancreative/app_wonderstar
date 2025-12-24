@@ -335,8 +335,8 @@ const EditVoucherModal: React.FC<EditVoucherModalProps> = ({ isOpen, onClose, on
       const specialProductIds = data?.map(p => p.product_id) || [];
 
       return productIds.length > 0 &&
-             productIds.every(id => specialProductIds.includes(id)) &&
-             specialProductIds.every(id => productIds.includes(id));
+        productIds.every(id => specialProductIds.includes(id)) &&
+        specialProductIds.every(id => productIds.includes(id));
     } catch (error) {
       console.error('Error checking special discount:', error);
       return false;
@@ -389,8 +389,8 @@ const EditVoucherModal: React.FC<EditVoucherModalProps> = ({ isOpen, onClose, on
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-full sm:max-w-2xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 bg-gradient-to-r from-blue-500 to-blue-600 text-white p-6 rounded-t-2xl flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-white bg-opacity-20 rounded-lg">
@@ -457,15 +457,14 @@ const EditVoucherModal: React.FC<EditVoucherModalProps> = ({ isOpen, onClose, on
               <label className="block text-sm font-bold text-gray-900 mb-2">
                 Discount Type *
               </label>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
                 <button
                   type="button"
                   onClick={() => setFormData({ ...formData, discount_type: 'percentage' })}
-                  className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
-                    formData.discount_type === 'percentage'
+                  className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${formData.discount_type === 'percentage'
                       ? 'border-blue-500 bg-blue-50'
                       : 'border-gray-200 hover:border-gray-300'
-                  }`}
+                    }`}
                 >
                   <Percent className={`w-6 h-6 ${formData.discount_type === 'percentage' ? 'text-blue-600' : 'text-gray-400'}`} />
                   <span className="text-sm font-bold">Percentage</span>
@@ -473,11 +472,10 @@ const EditVoucherModal: React.FC<EditVoucherModalProps> = ({ isOpen, onClose, on
                 <button
                   type="button"
                   onClick={() => setFormData({ ...formData, discount_type: 'fixed' })}
-                  className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
-                    formData.discount_type === 'fixed'
+                  className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${formData.discount_type === 'fixed'
                       ? 'border-blue-500 bg-blue-50'
                       : 'border-gray-200 hover:border-gray-300'
-                  }`}
+                    }`}
                 >
                   <DollarSign className={`w-6 h-6 ${formData.discount_type === 'fixed' ? 'text-blue-600' : 'text-gray-400'}`} />
                   <span className="text-sm font-bold">Fixed Amount</span>
@@ -485,11 +483,10 @@ const EditVoucherModal: React.FC<EditVoucherModalProps> = ({ isOpen, onClose, on
                 <button
                   type="button"
                   onClick={() => setFormData({ ...formData, discount_type: 'free_gift' })}
-                  className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
-                    formData.discount_type === 'free_gift'
+                  className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${formData.discount_type === 'free_gift'
                       ? 'border-blue-500 bg-blue-50'
                       : 'border-gray-200 hover:border-gray-300'
-                  }`}
+                    }`}
                 >
                   <Gift className={`w-6 h-6 ${formData.discount_type === 'free_gift' ? 'text-blue-600' : 'text-gray-400'}`} />
                   <span className="text-sm font-bold">FREE GIFT</span>
@@ -690,11 +687,10 @@ const EditVoucherModal: React.FC<EditVoucherModalProps> = ({ isOpen, onClose, on
                   onClick={() => {
                     setFormData({ ...formData, application_scope: 'order_total', restriction_type: 'none' });
                   }}
-                  className={`p-4 rounded-xl border-2 transition-all text-left ${
-                    formData.application_scope === 'order_total'
+                  className={`p-4 rounded-xl border-2 transition-all text-left ${formData.application_scope === 'order_total'
                       ? 'border-blue-500 bg-blue-50'
                       : 'border-gray-200 hover:border-gray-300'
-                  }`}
+                    }`}
                 >
                   <div className="font-bold text-sm mb-1">Order Total</div>
                   <div className="text-xs text-gray-600">Discount applies to entire order</div>
@@ -704,11 +700,10 @@ const EditVoucherModal: React.FC<EditVoucherModalProps> = ({ isOpen, onClose, on
                   onClick={() => {
                     setFormData({ ...formData, application_scope: 'product_level' });
                   }}
-                  className={`p-4 rounded-xl border-2 transition-all text-left ${
-                    formData.application_scope === 'product_level'
+                  className={`p-4 rounded-xl border-2 transition-all text-left ${formData.application_scope === 'product_level'
                       ? 'border-blue-500 bg-blue-50'
                       : 'border-gray-200 hover:border-gray-300'
-                  }`}
+                    }`}
                 >
                   <div className="font-bold text-sm mb-1">Product Level</div>
                   <div className="text-xs text-gray-600">Discount applies to specific products</div>
@@ -726,11 +721,10 @@ const EditVoucherModal: React.FC<EditVoucherModalProps> = ({ isOpen, onClose, on
                     <button
                       type="button"
                       onClick={() => setFormData({ ...formData, product_application_method: 'total_once' })}
-                      className={`p-4 rounded-xl border-2 transition-all text-left ${
-                        formData.product_application_method === 'total_once'
+                      className={`p-4 rounded-xl border-2 transition-all text-left ${formData.product_application_method === 'total_once'
                           ? 'border-blue-500 bg-blue-50'
                           : 'border-gray-200 hover:border-gray-300'
-                      }`}
+                        }`}
                     >
                       <div className="font-bold text-sm mb-1">Apply to Overall Total</div>
                       <div className="text-xs text-gray-600">
@@ -744,11 +738,10 @@ const EditVoucherModal: React.FC<EditVoucherModalProps> = ({ isOpen, onClose, on
                     <button
                       type="button"
                       onClick={() => setFormData({ ...formData, product_application_method: 'per_product' })}
-                      className={`p-4 rounded-xl border-2 transition-all text-left ${
-                        formData.product_application_method === 'per_product'
+                      className={`p-4 rounded-xl border-2 transition-all text-left ${formData.product_application_method === 'per_product'
                           ? 'border-blue-500 bg-blue-50'
                           : 'border-gray-200 hover:border-gray-300'
-                      }`}
+                        }`}
                     >
                       <div className="font-bold text-sm mb-1">Apply to Every Applicable Product</div>
                       <div className="text-xs text-gray-600">
@@ -787,247 +780,242 @@ const EditVoucherModal: React.FC<EditVoucherModalProps> = ({ isOpen, onClose, on
                     <strong>All Products:</strong> No restrictions, applies to entire order.
                     <strong className="ml-2">By Product:</strong> Select specific products below.
                   </p>
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFormData({ ...formData, restriction_type: 'none' });
-                      setSelectedProducts([]);
-                      setSelectedCategories([]);
-                      setSelectedSubcategories([]);
-                    }}
-                    className={`p-3 rounded-xl border-2 transition-all text-sm font-bold ${
-                      formData.restriction_type === 'none'
-                        ? 'border-blue-500 bg-blue-50 text-blue-700'
-                        : 'border-gray-200 hover:border-gray-300 text-gray-700'
-                    }`}
-                  >
-                    All Products
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, restriction_type: 'products' })}
-                    className={`p-3 rounded-xl border-2 transition-all text-sm font-bold ${
-                      formData.restriction_type === 'products'
-                        ? 'border-blue-500 bg-blue-50 text-blue-700'
-                        : 'border-gray-200 hover:border-gray-300 text-gray-700'
-                    }`}
-                  >
-                    By Product
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, restriction_type: 'categories' })}
-                    className={`p-3 rounded-xl border-2 transition-all text-sm font-bold ${
-                      formData.restriction_type === 'categories'
-                        ? 'border-blue-500 bg-blue-50 text-blue-700'
-                        : 'border-gray-200 hover:border-gray-300 text-gray-700'
-                    }`}
-                  >
-                    By Category
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, restriction_type: 'subcategories' })}
-                    className={`p-3 rounded-xl border-2 transition-all text-sm font-bold ${
-                      formData.restriction_type === 'subcategories'
-                        ? 'border-blue-500 bg-blue-50 text-blue-700'
-                        : 'border-gray-200 hover:border-gray-300 text-gray-700'
-                    }`}
-                  >
-                    By Subcategory
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, restriction_type: 'special_discount' })}
-                    className={`p-3 rounded-xl border-2 transition-all text-sm font-bold ${
-                      formData.restriction_type === 'special_discount'
-                        ? 'border-blue-500 bg-blue-50 text-blue-700'
-                        : 'border-gray-200 hover:border-gray-300 text-gray-700'
-                    }`}
-                  >
-                    Special Discount
-                  </button>
-                </div>
-
-                {formData.restriction_type === 'products' && (
-                  <div className="border-2 border-gray-200 rounded-xl p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-sm font-bold text-gray-900">
-                        Select Products ({selectedProducts.length})
-                      </span>
-                      {selectedProducts.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => setSelectedProducts([])}
-                          className="text-xs text-blue-600 hover:text-blue-700 font-bold"
-                        >
-                          Clear All
-                        </button>
-                      )}
-                    </div>
-                    <div className="relative mb-3">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <input
-                        type="text"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Search products..."
-                        className="w-full pl-10 pr-4 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:outline-none text-sm"
-                      />
-                    </div>
-                    <div className="max-h-64 overflow-y-auto space-y-2">
-                      {filteredProducts.length === 0 ? (
-                        <p className="text-sm text-gray-500 text-center py-8">No products found</p>
-                      ) : (
-                        filteredProducts.map((product) => (
-                          <label
-                            key={product.id}
-                            className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer border border-gray-100"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={selectedProducts.includes(product.product_id)}
-                              onChange={() => toggleProduct(product.product_id)}
-                              className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                            />
-                            <ShoppingBag className="w-4 h-4 text-gray-400" />
-                            <div className="flex-1 min-w-0">
-                              <div className="text-sm font-bold text-gray-900 truncate">{product.name}</div>
-                              <div className="text-xs text-gray-500">{product.product_id} • RM {product.base_price}</div>
-                            </div>
-                          </label>
-                        ))
-                      )}
-                    </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3 mb-4">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormData({ ...formData, restriction_type: 'none' });
+                        setSelectedProducts([]);
+                        setSelectedCategories([]);
+                        setSelectedSubcategories([]);
+                      }}
+                      className={`p-3 rounded-xl border-2 transition-all text-sm font-bold ${formData.restriction_type === 'none'
+                          ? 'border-blue-500 bg-blue-50 text-blue-700'
+                          : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                        }`}
+                    >
+                      All Products
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, restriction_type: 'products' })}
+                      className={`p-3 rounded-xl border-2 transition-all text-sm font-bold ${formData.restriction_type === 'products'
+                          ? 'border-blue-500 bg-blue-50 text-blue-700'
+                          : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                        }`}
+                    >
+                      By Product
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, restriction_type: 'categories' })}
+                      className={`p-3 rounded-xl border-2 transition-all text-sm font-bold ${formData.restriction_type === 'categories'
+                          ? 'border-blue-500 bg-blue-50 text-blue-700'
+                          : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                        }`}
+                    >
+                      By Category
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, restriction_type: 'subcategories' })}
+                      className={`p-3 rounded-xl border-2 transition-all text-sm font-bold ${formData.restriction_type === 'subcategories'
+                          ? 'border-blue-500 bg-blue-50 text-blue-700'
+                          : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                        }`}
+                    >
+                      By Subcategory
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, restriction_type: 'special_discount' })}
+                      className={`p-3 rounded-xl border-2 transition-all text-sm font-bold ${formData.restriction_type === 'special_discount'
+                          ? 'border-blue-500 bg-blue-50 text-blue-700'
+                          : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                        }`}
+                    >
+                      Special Discount
+                    </button>
                   </div>
-                )}
 
-                {formData.restriction_type === 'categories' && (
-                  <div className="border-2 border-gray-200 rounded-xl p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-sm font-bold text-gray-900">
-                        Select Categories ({selectedCategories.length})
-                      </span>
-                      {selectedCategories.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => setSelectedCategories([])}
-                          className="text-xs text-blue-600 hover:text-blue-700 font-bold"
-                        >
-                          Clear All
-                        </button>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      {categories.length === 0 ? (
-                        <p className="text-sm text-gray-500 text-center py-8">No categories found</p>
-                      ) : (
-                        categories.map((category) => (
-                          <label
-                            key={category.id}
-                            className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer border border-gray-100"
+                  {formData.restriction_type === 'products' && (
+                    <div className="border-2 border-gray-200 rounded-xl p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-bold text-gray-900">
+                          Select Products ({selectedProducts.length})
+                        </span>
+                        {selectedProducts.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedProducts([])}
+                            className="text-xs text-blue-600 hover:text-blue-700 font-bold"
                           >
-                            <input
-                              type="checkbox"
-                              checked={selectedCategories.includes(category.id)}
-                              onChange={() => toggleCategory(category.id)}
-                              className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                            />
-                            <Package className="w-4 h-4 text-gray-400" />
-                            <div className="flex-1">
-                              <div className="text-sm font-bold text-gray-900">{category.name}</div>
-                              <div className="text-xs text-gray-500">{category.category_id}</div>
-                            </div>
-                          </label>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {formData.restriction_type === 'subcategories' && (
-                  <div className="border-2 border-gray-200 rounded-xl p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-sm font-bold text-gray-900">
-                        Select Subcategories ({selectedSubcategories.length})
-                      </span>
-                      {selectedSubcategories.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => setSelectedSubcategories([])}
-                          className="text-xs text-blue-600 hover:text-blue-700 font-bold"
-                        >
-                          Clear All
-                        </button>
-                      )}
-                    </div>
-                    <div className="max-h-64 overflow-y-auto space-y-2">
-                      {subcategories.length === 0 ? (
-                        <p className="text-sm text-gray-500 text-center py-8">No subcategories found</p>
-                      ) : (
-                        subcategories.map((subcategory) => {
-                          const parentCategory = categories.find(c => c.id === subcategory.category_id);
-                          return (
+                            Clear All
+                          </button>
+                        )}
+                      </div>
+                      <div className="relative mb-3">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input
+                          type="text"
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          placeholder="Search products..."
+                          className="w-full pl-10 pr-4 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:outline-none text-sm"
+                        />
+                      </div>
+                      <div className="max-h-64 overflow-y-auto space-y-2">
+                        {filteredProducts.length === 0 ? (
+                          <p className="text-sm text-gray-500 text-center py-8">No products found</p>
+                        ) : (
+                          filteredProducts.map((product) => (
                             <label
-                              key={subcategory.id}
+                              key={product.id}
                               className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer border border-gray-100"
                             >
                               <input
                                 type="checkbox"
-                                checked={selectedSubcategories.includes(subcategory.id)}
-                                onChange={() => toggleSubcategory(subcategory.id)}
+                                checked={selectedProducts.includes(product.product_id)}
+                                onChange={() => toggleProduct(product.product_id)}
                                 className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
                               />
-                              <Layers className="w-4 h-4 text-gray-400" />
-                              <div className="flex-1">
-                                <div className="text-sm font-bold text-gray-900">{subcategory.name}</div>
-                                <div className="text-xs text-gray-500">
-                                  {subcategory.subcategory_id} • {parentCategory?.name || 'Unknown Category'}
-                                </div>
+                              <ShoppingBag className="w-4 h-4 text-gray-400" />
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm font-bold text-gray-900 truncate">{product.name}</div>
+                                <div className="text-xs text-gray-500">{product.product_id} • RM {product.base_price}</div>
                               </div>
                             </label>
-                          );
-                        })
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {formData.restriction_type === 'special_discount' && (
-                  <div className="border-2 border-blue-200 bg-blue-50 rounded-xl p-4">
-                    <div className="flex items-start gap-3">
-                      <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                      <div className="flex-1">
-                        <p className="text-sm font-bold text-blue-900 mb-1">Special Discount Products - Daily Redeemable</p>
-                        <p className="text-sm text-blue-700 mb-3">
-                          This voucher will automatically apply to all products marked as "Special Discount" in the product catalog.
-                        </p>
-                        <div className="bg-green-100 border border-green-300 rounded-lg p-3 mb-3">
-                          <p className="text-sm font-bold text-green-900 mb-1">🎯 Daily Redemption Feature</p>
-                          <p className="text-xs text-green-800">
-                            Users can redeem this voucher code <strong>once per day</strong>. Each redemption is valid until midnight of that day.
-                            The same code can be redeemed again the next day!
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2 p-3 bg-white border border-blue-200 rounded-lg">
-                          <Package className="w-5 h-5 text-blue-600" />
-                          <div>
-                            <p className="text-sm font-bold text-gray-900">
-                              {specialDiscountCount} {specialDiscountCount === 1 ? 'product' : 'products'} available
-                            </p>
-                            <p className="text-xs text-gray-600">Currently marked as special discount</p>
-                          </div>
-                        </div>
-                        {specialDiscountCount === 0 && (
-                          <p className="text-xs text-orange-600 mt-2 font-medium">
-                            Note: No products are currently marked as special discount. This voucher won't be applicable until products are marked.
-                          </p>
+                          ))
                         )}
                       </div>
                     </div>
-                  </div>
-                )}
+                  )}
+
+                  {formData.restriction_type === 'categories' && (
+                    <div className="border-2 border-gray-200 rounded-xl p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-bold text-gray-900">
+                          Select Categories ({selectedCategories.length})
+                        </span>
+                        {selectedCategories.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedCategories([])}
+                            className="text-xs text-blue-600 hover:text-blue-700 font-bold"
+                          >
+                            Clear All
+                          </button>
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        {categories.length === 0 ? (
+                          <p className="text-sm text-gray-500 text-center py-8">No categories found</p>
+                        ) : (
+                          categories.map((category) => (
+                            <label
+                              key={category.id}
+                              className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer border border-gray-100"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selectedCategories.includes(category.id)}
+                                onChange={() => toggleCategory(category.id)}
+                                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                              />
+                              <Package className="w-4 h-4 text-gray-400" />
+                              <div className="flex-1">
+                                <div className="text-sm font-bold text-gray-900">{category.name}</div>
+                                <div className="text-xs text-gray-500">{category.category_id}</div>
+                              </div>
+                            </label>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {formData.restriction_type === 'subcategories' && (
+                    <div className="border-2 border-gray-200 rounded-xl p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-bold text-gray-900">
+                          Select Subcategories ({selectedSubcategories.length})
+                        </span>
+                        {selectedSubcategories.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedSubcategories([])}
+                            className="text-xs text-blue-600 hover:text-blue-700 font-bold"
+                          >
+                            Clear All
+                          </button>
+                        )}
+                      </div>
+                      <div className="max-h-64 overflow-y-auto space-y-2">
+                        {subcategories.length === 0 ? (
+                          <p className="text-sm text-gray-500 text-center py-8">No subcategories found</p>
+                        ) : (
+                          subcategories.map((subcategory) => {
+                            const parentCategory = categories.find(c => c.id === subcategory.category_id);
+                            return (
+                              <label
+                                key={subcategory.id}
+                                className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer border border-gray-100"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={selectedSubcategories.includes(subcategory.id)}
+                                  onChange={() => toggleSubcategory(subcategory.id)}
+                                  className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                                />
+                                <Layers className="w-4 h-4 text-gray-400" />
+                                <div className="flex-1">
+                                  <div className="text-sm font-bold text-gray-900">{subcategory.name}</div>
+                                  <div className="text-xs text-gray-500">
+                                    {subcategory.subcategory_id} • {parentCategory?.name || 'Unknown Category'}
+                                  </div>
+                                </div>
+                              </label>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {formData.restriction_type === 'special_discount' && (
+                    <div className="border-2 border-blue-200 bg-blue-50 rounded-xl p-4">
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                        <div className="flex-1">
+                          <p className="text-sm font-bold text-blue-900 mb-1">Special Discount Products - Daily Redeemable</p>
+                          <p className="text-sm text-blue-700 mb-3">
+                            This voucher will automatically apply to all products marked as "Special Discount" in the product catalog.
+                          </p>
+                          <div className="bg-green-100 border border-green-300 rounded-lg p-3 mb-3">
+                            <p className="text-sm font-bold text-green-900 mb-1">🎯 Daily Redemption Feature</p>
+                            <p className="text-xs text-green-800">
+                              Users can redeem this voucher code <strong>once per day</strong>. Each redemption is valid until midnight of that day.
+                              The same code can be redeemed again the next day!
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 p-3 bg-white border border-blue-200 rounded-lg">
+                            <Package className="w-5 h-5 text-blue-600" />
+                            <div>
+                              <p className="text-sm font-bold text-gray-900">
+                                {specialDiscountCount} {specialDiscountCount === 1 ? 'product' : 'products'} available
+                              </p>
+                              <p className="text-xs text-gray-600">Currently marked as special discount</p>
+                            </div>
+                          </div>
+                          {specialDiscountCount === 0 && (
+                            <p className="text-xs text-orange-600 mt-2 font-medium">
+                              Note: No products are currently marked as special discount. This voucher won't be applicable until products are marked.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </>
             )}
@@ -1046,11 +1034,10 @@ const EditVoucherModal: React.FC<EditVoucherModalProps> = ({ isOpen, onClose, on
                     setFormData({ ...formData, outlet_restriction_type: 'all_outlets' });
                     setSelectedOutlets([]);
                   }}
-                  className={`p-4 rounded-xl border-2 transition-all text-left ${
-                    formData.outlet_restriction_type === 'all_outlets'
+                  className={`p-4 rounded-xl border-2 transition-all text-left ${formData.outlet_restriction_type === 'all_outlets'
                       ? 'border-blue-500 bg-blue-50'
                       : 'border-gray-200 hover:border-gray-300'
-                  }`}
+                    }`}
                 >
                   <div className="font-bold text-sm mb-1">All Outlets</div>
                   <div className="text-xs text-gray-600">Voucher works at all locations</div>
@@ -1058,11 +1045,10 @@ const EditVoucherModal: React.FC<EditVoucherModalProps> = ({ isOpen, onClose, on
                 <button
                   type="button"
                   onClick={() => setFormData({ ...formData, outlet_restriction_type: 'specific_outlets' })}
-                  className={`p-4 rounded-xl border-2 transition-all text-left ${
-                    formData.outlet_restriction_type === 'specific_outlets'
+                  className={`p-4 rounded-xl border-2 transition-all text-left ${formData.outlet_restriction_type === 'specific_outlets'
                       ? 'border-blue-500 bg-blue-50'
                       : 'border-gray-200 hover:border-gray-300'
-                  }`}
+                    }`}
                 >
                   <div className="font-bold text-sm mb-1">Specific Outlets Only</div>
                   <div className="text-xs text-gray-600">Limit to selected locations</div>
