@@ -57,7 +57,52 @@ export const voucherService = {
       const { data, error } = await query;
 
       if (error) throw error;
-      return (data as any[]) || [];
+
+      // SYNC: Update max_usage_count from parent voucher's usage_limit_per_user
+      // This ensures users who redeemed before get the updated limits
+      const vouchers = (data as any[]) || [];
+      for (const userVoucher of vouchers) {
+        const parentLimit = userVoucher.voucher?.usage_limit_per_user;
+        const currentMax = userVoucher.max_usage_count || 1;
+
+        // If parent voucher has a higher limit, update the user_voucher
+        if (parentLimit && parentLimit > currentMax) {
+          console.log(`[VoucherService] Syncing max_usage_count for user ${userId}: ${currentMax} -> ${parentLimit}`);
+
+          // Determine the new status:
+          // - If they have remaining uses AND status was 'used' or 'expired' due to usage limit, reset to 'available'
+          // - Keep 'expired' only if the EXPIRY DATE has passed (check separately)
+          const usageCount = userVoucher.usage_count || 0;
+          const hasRemainingUses = usageCount < parentLimit;
+
+          // Check if voucher is date-expired (not usage-expired)
+          const expiresAt = userVoucher.expires_at ? new Date(userVoucher.expires_at) : null;
+          const isDateExpired = expiresAt && expiresAt < new Date();
+
+          let newStatus = userVoucher.status;
+          if (hasRemainingUses && !isDateExpired) {
+            // Has remaining uses and not date-expired, so make it available
+            newStatus = 'available';
+          }
+
+          // Update the user_voucher with the new limit
+          await supabase
+            .from('user_vouchers')
+            .update({
+              max_usage_count: parentLimit,
+              status: newStatus
+            })
+            .eq('id', userVoucher.id);
+
+          // Update the local copy as well
+          userVoucher.max_usage_count = parentLimit;
+          userVoucher.status = newStatus;
+
+          console.log(`[VoucherService] Updated voucher ${userVoucher.id}: max_usage=${parentLimit}, status=${newStatus}`);
+        }
+      }
+
+      return vouchers;
     } catch (error) {
       console.error('Error fetching user vouchers:', error);
       return [];
@@ -279,6 +324,15 @@ export const voucherService = {
     expiresIn?: number
   ): Promise<{ success: boolean; userVoucher?: UserVoucher; error?: string }> {
     try {
+      // First, fetch the parent voucher to get its usage_limit_per_user
+      const { data: parentVoucher } = await supabase
+        .from('vouchers')
+        .select('usage_limit_per_user')
+        .eq('id', voucherId)
+        .single();
+
+      const maxUsageCount = parentVoucher?.usage_limit_per_user || 1;
+
       const expiresAt = expiresIn
         ? new Date(Date.now() + expiresIn).toISOString()
         : undefined;
@@ -291,7 +345,7 @@ export const voucherService = {
           status: 'available',
           expires_at: expiresAt,
           issued_by_rule_id: ruleId,
-          max_usage_count: 1,
+          max_usage_count: maxUsageCount,  // Use parent voucher's limit
           metadata: {
             auto_issued: true,
             issued_at: new Date().toISOString()

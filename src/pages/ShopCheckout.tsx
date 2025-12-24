@@ -1114,14 +1114,9 @@ const ShopCheckout: React.FC = () => {
         console.warn('Failed to create redemption records, but order was successful:', redemptionError);
       }
 
-      try {
-        await earnStars(calculateStarsEarning(), 'shop_purchase', {
-          order_id: order.id,
-          payment_method: selectedPayment
-        });
-      } catch (starsError) {
-        console.warn('Failed to award stars, but order was successful:', starsError);
-      }
+      // NOTE: Stars are awarded by the WPay backend for W-Balance payments
+      // Do NOT call earnStars here as it would result in duplicate awarding
+      // The stars_earned value in the order comes from wpayResponse.transaction_details.stars_awarded
 
       try {
         const stampsEarned = calculateStampsFromOrder(orderItems);

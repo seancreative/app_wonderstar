@@ -184,7 +184,9 @@ const ShopCart: React.FC = () => {
 
   const calculateStarsEarning = (paymentMethod: string = 'wonderstars') => {
     const finalAmount = calculateTotal();
-    const baseStars = Math.floor(finalAmount * 25);
+    // Base rate: 2.5 stars per RM (NOT 25!)
+    const baseStars = Math.floor(finalAmount * 2.5);
+    // WonderStars payment gets 20% bonus on star earning display
     const multiplier = paymentMethod === 'wonderstars' ? 1.2 : 1.0;
     return Math.max(0, Math.floor(baseStars * multiplier));
   };
