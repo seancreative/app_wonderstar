@@ -10,6 +10,30 @@ export const formatDateTimeCMS = (dateString: string): string => {
   return `${hours}:${minutes} ${day}/${month}/${year}`;
 };
 
+// Excel-friendly date format DD-MM-YYYY HH:MM (unambiguous)
+export const formatDateTimeExcel = (dateString: string): string => {
+  const date = new Date(dateString);
+
+  const hours = date.getHours().toString().padStart(2, '0');
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  const day = date.getDate().toString().padStart(2, '0');
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const year = date.getFullYear();
+
+  return `${day}-${month}-${year} ${hours}:${minutes}`;
+};
+
+// Excel-friendly date only format DD-MM-YYYY
+export const formatDateExcel = (dateString: string): string => {
+  const date = new Date(dateString);
+
+  const day = date.getDate().toString().padStart(2, '0');
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const year = date.getFullYear();
+
+  return `${day}-${month}-${year}`;
+};
+
 export const formatDateCMS = (dateString: string): string => {
   const date = new Date(dateString);
 

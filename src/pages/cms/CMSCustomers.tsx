@@ -118,7 +118,9 @@ const CMSCustomers: React.FC = () => {
     searchTerm === '' ||
     customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     customer.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    customer.phone?.toLowerCase().includes(searchTerm.toLowerCase())
+    customer.phone?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    customer.state?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    customer.postcode?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const getCustomerBalance = (customer: CustomerWithDetails) => {
@@ -127,16 +129,20 @@ const CMSCustomers: React.FC = () => {
   };
 
   const exportToCSV = () => {
-    const headers = ['Customer ID', 'Name', 'Email', 'Phone', 'Children', 'Total Topups', 'Balance', 'Joined Date'];
+    const headers = ['Customer ID', 'Name', 'Email', 'Phone', 'State', 'Postcode', 'Country', 'Children', 'Total Topups', 'Balance', 'Bonus Balance', 'Joined Date'];
     const rows = filteredCustomers.map(customer => [
       customer.display_id || 'Pending',
       customer.name,
       customer.email,
       customer.phone || '-',
+      customer.state || '-',
+      customer.postcode || '-',
+      customer.country || 'Malaysia',
       customer.child_profiles?.length || 0,
       `RM ${customer.lifetime_topups.toFixed(2)}`,
       `RM ${getCustomerBalance(customer).toFixed(2)}`,
-      new Date(customer.created_at).toLocaleDateString()
+      `RM ${(bonusBalances[customer.id] || 0).toFixed(2)}`,
+      new Date(customer.created_at).toLocaleDateString('en-GB') // DD/MM/YYYY format
     ]);
 
     const csv = [
@@ -159,6 +165,36 @@ const CMSCustomers: React.FC = () => {
       ? filteredCustomers.reduce((sum, c) => sum + c.lifetime_topups, 0) / filteredCustomers.length
       : 0,
     totalChildren: filteredCustomers.reduce((sum, c) => sum + (c.child_profiles?.length || 0), 0)
+  };
+
+  // Calculate customer distribution by state
+  const stateDistribution = filteredCustomers.reduce((acc, customer) => {
+    const state = customer.state || 'Unknown';
+    acc[state] = (acc[state] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  // Sort by count descending
+  const sortedStates = Object.entries(stateDistribution)
+    .sort((a, b) => b[1] - a[1]);
+
+  // State colors for visual distinction
+  const stateColors: Record<string, string> = {
+    'Selangor': 'from-blue-400 to-blue-500',
+    'Kuala Lumpur': 'from-red-400 to-red-500',
+    'Johor': 'from-green-400 to-green-500',
+    'Penang': 'from-yellow-400 to-yellow-500',
+    'Perak': 'from-purple-400 to-purple-500',
+    'Kedah': 'from-pink-400 to-pink-500',
+    'Kelantan': 'from-indigo-400 to-indigo-500',
+    'Terengganu': 'from-teal-400 to-teal-500',
+    'Pahang': 'from-orange-400 to-orange-500',
+    'Negeri Sembilan': 'from-cyan-400 to-cyan-500',
+    'Malacca': 'from-rose-400 to-rose-500',
+    'Sabah': 'from-emerald-400 to-emerald-500',
+    'Sarawak': 'from-amber-400 to-amber-500',
+    'Perlis': 'from-lime-400 to-lime-500',
+    'Unknown': 'from-gray-400 to-gray-500'
   };
 
   if (loading) {
@@ -233,12 +269,65 @@ const CMSCustomers: React.FC = () => {
           </button>
         </div>
 
+        {/* Customer Distribution by State */}
+        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+          <div className="p-6 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-black text-gray-900">Customer Distribution by State</h2>
+                <p className="text-sm text-gray-600 mt-1">{sortedStates.length} states represented</p>
+              </div>
+              <MapPin className="w-8 h-8 text-gray-400" />
+            </div>
+          </div>
+          <div className="p-6">
+            {sortedStates.length === 0 ? (
+              <div className="text-center py-8">
+                <MapPin className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                <p className="text-gray-600 font-medium">No location data available</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                {sortedStates.map(([state, count]) => {
+                  const percentage = ((count / stats.total) * 100).toFixed(1);
+                  const colorClass = stateColors[state] || 'from-gray-400 to-gray-500';
+                  return (
+                    <div
+                      key={state}
+                      className="relative bg-white rounded-xl border-2 border-gray-200 p-4 hover:shadow-lg hover:scale-105 transition-all cursor-pointer"
+                      onClick={() => setSearchTerm(state === 'Unknown' ? '' : state)}
+                    >
+                      <div className={`absolute top-0 left-0 right-0 h-1 rounded-t-xl bg-gradient-to-r ${colorClass}`} />
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${colorClass} flex items-center justify-center text-white font-bold text-sm shadow-lg`}>
+                          {count}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-gray-900 text-sm truncate">{state}</p>
+                          <p className="text-xs text-gray-500">{percentage}%</p>
+                        </div>
+                      </div>
+                      {/* Progress bar */}
+                      <div className="mt-3 h-2 bg-gray-100 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full bg-gradient-to-r ${colorClass} rounded-full transition-all duration-500`}
+                          style={{ width: `${percentage}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
         <div className="bg-white rounded-2xl border border-gray-200 p-6">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
               type="text"
-              placeholder="Search by name, email, or phone..."
+              placeholder="Search by name, email, phone, or state..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:outline-none font-medium"
@@ -254,6 +343,7 @@ const CMSCustomers: React.FC = () => {
                   <th className="text-left px-6 py-4 text-sm font-bold text-gray-900">Customer ID</th>
                   <th className="text-left px-6 py-4 text-sm font-bold text-gray-900">Customer</th>
                   <th className="text-left px-6 py-4 text-sm font-bold text-gray-900">Contact</th>
+                  <th className="text-left px-6 py-4 text-sm font-bold text-gray-900">Location</th>
                   <th className="text-left px-6 py-4 text-sm font-bold text-gray-900">Children</th>
                   <th className="text-left px-6 py-4 text-sm font-bold text-gray-900">Total Topups</th>
                   <th className="text-left px-6 py-4 text-sm font-bold text-gray-900">Wallet Balance</th>
@@ -265,7 +355,7 @@ const CMSCustomers: React.FC = () => {
               <tbody>
                 {filteredCustomers.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-6 py-12 text-center">
+                    <td colSpan={10} className="px-6 py-12 text-center">
                       <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                       <p className="text-gray-600 font-medium">No customers found</p>
                     </td>
@@ -321,11 +411,21 @@ const CMSCustomers: React.FC = () => {
                                 {customer.phone}
                               </div>
                             )}
-                            {customer.city && (
-                              <div className="flex items-center gap-2 text-sm text-gray-600">
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="space-y-1">
+                            {customer.state && (
+                              <div className="flex items-center gap-2 text-sm text-gray-700">
                                 <MapPin className="w-3 h-3 text-gray-400" />
-                                {customer.city}
+                                {customer.state}
                               </div>
+                            )}
+                            {customer.postcode && (
+                              <p className="text-xs text-gray-500 ml-5">{customer.postcode}</p>
+                            )}
+                            {!customer.state && !customer.postcode && (
+                              <span className="text-xs text-gray-400">-</span>
                             )}
                           </div>
                         </td>

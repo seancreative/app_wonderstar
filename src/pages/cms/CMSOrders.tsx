@@ -25,7 +25,8 @@ import {
   Star,
   Receipt,
   Trash2,
-  AlertTriangle
+  AlertTriangle,
+  RotateCcw
 } from 'lucide-react';
 import QRCodeDisplay from '../../components/QRCodeDisplay';
 import ReceiptModal from '../../components/ReceiptModal';
@@ -34,7 +35,7 @@ import OrderTimeline from '../../components/OrderTimeline';
 import { supabase } from '../../lib/supabase';
 import { ShopOrder, Outlet, User as UserType, OrderItemRedemption } from '../../types/database';
 import { getPaymentMethodConfig, formatDiscountAmount, formatCurrency } from '../../utils/paymentMethodUtils';
-import { formatDateTimeCMS } from '../../utils/dateFormatter';
+import { formatDateTimeCMS, formatDateTimeExcel } from '../../utils/dateFormatter';
 import {
   getItemOriginalSubtotal,
   getItemFinalPrice,
@@ -81,6 +82,21 @@ const CMSOrders: React.FC = () => {
   const [deleting, setDeleting] = useState(false);
   // Bulk selection
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
+  const [viewDeleted, setViewDeleted] = useState(false);
+
+  // Custom Delete Modal State
+  const [deleteConfirmModal, setDeleteConfirmModal] = useState<{
+    isOpen: boolean;
+    type: 'single' | 'bulk' | 'restore';
+    orderId?: string;
+    count?: number;
+    isPermanent?: boolean;
+    isFallback?: boolean; // For when soft delete fails
+  }>({
+    isOpen: false,
+    type: 'single',
+    isPermanent: false
+  });
 
   useEffect(() => {
     loadOutlets();
@@ -106,7 +122,7 @@ const CMSOrders: React.FC = () => {
     return () => {
       supabase.removeChannel(redemptionChannel);
     };
-  }, [statusFilter, paymentStatusFilter, paymentTypeFilter, outletFilter]);
+  }, [statusFilter, paymentStatusFilter, paymentTypeFilter, outletFilter, viewDeleted]);
 
   const loadOutlets = async () => {
     try {
@@ -159,6 +175,8 @@ const CMSOrders: React.FC = () => {
       if (outletFilter !== 'all') {
         query = query.eq('outlet_id', outletFilter);
       }
+
+
 
       const { data: ordersData, error: ordersError } = await query;
 
@@ -229,7 +247,11 @@ const CMSOrders: React.FC = () => {
     const matchesDateStart = !dateFilter.start || orderDate >= new Date(dateFilter.start);
     const matchesDateEnd = !dateFilter.end || orderDate <= new Date(dateFilter.end);
 
-    return matchesSearch && matchesDateStart && matchesDateEnd;
+    const matchesDeleted = viewDeleted
+      ? !!order.deleted_at
+      : !order.deleted_at;
+
+    return matchesSearch && matchesDateStart && matchesDateEnd && matchesDeleted;
   });
 
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
@@ -312,40 +334,128 @@ const CMSOrders: React.FC = () => {
     }
   };
 
-  const deleteOrder = async (orderId: string) => {
-    if (!window.confirm('Are you sure you want to delete this order? This action cannot be undone and will also delete all related redemptions.')) {
-      return;
-    }
-
-    setDeleting(true);
+  const updatePaymentStatus = async (orderId: string, newStatus: string) => {
+    setUpdatingStatus(true);
     try {
-      // First delete related order_item_redemptions
-      await supabase
-        .from('order_item_redemptions')
-        .delete()
-        .eq('order_id', orderId);
-
-      // Then delete the order
       const { error } = await supabase
         .from('shop_orders')
-        .delete()
+        .update({ payment_status: newStatus })
         .eq('id', orderId);
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
-      toast.success('Order deleted successfully');
+      toast.success('Payment status updated successfully');
       await loadOrders();
 
-      // Close modal if the deleted order was selected
+      if (selectedOrder?.id === orderId) {
+        const updatedOrder = orders.find(o => o.id === orderId);
+        if (updatedOrder) {
+          setSelectedOrder({ ...updatedOrder, payment_status: newStatus as any });
+        }
+      }
+    } catch (err: any) {
+      console.error('Error updating payment status:', err);
+      toast.error(`Failed to update payment status: ${err?.message}`);
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
+  const deleteOrder = async (orderId: string) => {
+    // Open modal instead of window.confirm
+    setDeleteConfirmModal({
+      isOpen: true,
+      type: 'single',
+      orderId,
+      isPermanent: viewDeleted
+    });
+  };
+
+  const executeDeleteOrder = async (orderId: string, forcePermanent: boolean = false) => {
+    setDeleting(true);
+    try {
+      if (viewDeleted || forcePermanent) {
+        // Permanent delete
+        // First delete related order_item_redemptions
+        await supabase
+          .from('order_item_redemptions')
+          .delete()
+          .eq('order_id', orderId);
+
+        // Then delete the order
+        const { error } = await supabase
+          .from('shop_orders')
+          .delete()
+          .eq('id', orderId);
+
+        if (error) throw error;
+        toast.success(forcePermanent ? 'Order PERMANENTLY deleted (Fallback)' : 'Order permanently deleted');
+      } else {
+        // Soft delete
+        const { error } = await supabase
+          .from('shop_orders')
+          .update({ deleted_at: new Date().toISOString() })
+          .eq('id', orderId);
+
+        if (error) throw error;
+        toast.success('Order moved to trash');
+      }
+
+      await loadOrders();
+
       if (selectedOrder?.id === orderId) {
         setShowDetailModal(false);
         setSelectedOrder(null);
       }
     } catch (err: any) {
       console.error('Error deleting order:', err);
-      toast.error(`Failed to delete order: ${err?.message || 'Unknown error'}`);
+      // Fallback: If soft delete fails due to missing column, offer permanent delete via modal update
+      if (!viewDeleted && !forcePermanent && (err?.message?.includes('column') || err?.code === 'PGRST204')) {
+        setDeleteConfirmModal({
+          isOpen: true,
+          type: 'single',
+          orderId,
+          isPermanent: true,
+          isFallback: true
+        });
+      } else {
+        toast.error(`Failed to delete order: ${err?.message || 'Unknown error'}`);
+      }
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const restoreOrder = async (orderId: string) => {
+    // Open modal for restore
+    setDeleteConfirmModal({
+      isOpen: true,
+      type: 'restore',
+      orderId,
+      isPermanent: false
+    });
+  };
+
+  const executeRestoreOrder = async (orderId: string) => {
+    setDeleting(true);
+    try {
+      const { error } = await supabase
+        .from('shop_orders')
+        .update({ deleted_at: null })
+        .eq('id', orderId);
+
+      if (error) throw error;
+
+      toast.success('Order restored successfully');
+      await loadOrders();
+
+      if (selectedOrder?.id === orderId) {
+        setShowDetailModal(false);
+        setSelectedOrder(null);
+      }
+    } catch (err: any) {
+      console.error('Error restoring order:', err);
+      toast.error(`Failed to restore order: ${err?.message}`);
     } finally {
       setDeleting(false);
     }
@@ -380,31 +490,46 @@ const CMSOrders: React.FC = () => {
       return;
     }
 
-    if (!window.confirm(`Are you sure you want to delete ${selectedOrderIds.size} order(s)? This action cannot be undone and will delete all related redemptions.`)) {
-      return;
-    }
+    setDeleteConfirmModal({
+      isOpen: true,
+      type: 'bulk',
+      count: selectedOrderIds.size,
+      isPermanent: viewDeleted
+    });
+  };
 
+  const executeBulkDelete = async (forcePermanent: boolean = false) => {
     setDeleting(true);
     try {
       const orderIdsArray = Array.from(selectedOrderIds);
 
-      // First delete related order_item_redemptions
-      await supabase
-        .from('order_item_redemptions')
-        .delete()
-        .in('order_id', orderIdsArray);
+      // If viewing deleted, this is a permanent delete
+      if (viewDeleted || forcePermanent) {
+        // First delete related order_item_redemptions
+        await supabase
+          .from('order_item_redemptions')
+          .delete()
+          .in('order_id', orderIdsArray);
 
-      // Then delete the orders
-      const { error } = await supabase
-        .from('shop_orders')
-        .delete()
-        .in('id', orderIdsArray);
+        // Then delete the orders
+        const { error } = await supabase
+          .from('shop_orders')
+          .delete()
+          .in('id', orderIdsArray);
 
-      if (error) {
-        throw error;
+        if (error) throw error;
+        toast.success(forcePermanent ? 'Orders PERMANENTLY deleted (Fallback)' : `${selectedOrderIds.size} order(s) permanently deleted`);
+      } else {
+        // Soft delete
+        const { error } = await supabase
+          .from('shop_orders')
+          .update({ deleted_at: new Date().toISOString() })
+          .in('id', orderIdsArray);
+
+        if (error) throw error;
+        toast.success(`${selectedOrderIds.size} order(s) moved to trash`);
       }
 
-      toast.success(`${selectedOrderIds.size} order(s) deleted successfully`);
       setSelectedOrderIds(new Set());
       await loadOrders();
 
@@ -415,10 +540,32 @@ const CMSOrders: React.FC = () => {
       }
     } catch (err: any) {
       console.error('Error deleting orders:', err);
-      toast.error(`Failed to delete orders: ${err?.message || 'Unknown error'}`);
+      // Fallback for bulk soft delete failure
+      if (!viewDeleted && !forcePermanent && (err?.message?.includes('column') || err?.code === 'PGRST204')) {
+        setDeleteConfirmModal({
+          isOpen: true,
+          type: 'bulk',
+          count: selectedOrderIds.size,
+          isPermanent: true,
+          isFallback: true
+        });
+      } else {
+        toast.error(`Failed to delete orders: ${err?.message || 'Unknown error'}`);
+      }
     } finally {
       setDeleting(false);
     }
+  };
+
+  const handleConfirmAction = () => {
+    if (deleteConfirmModal.type === 'single' && deleteConfirmModal.orderId) {
+      executeDeleteOrder(deleteConfirmModal.orderId, deleteConfirmModal.isPermanent);
+    } else if (deleteConfirmModal.type === 'bulk') {
+      executeBulkDelete(deleteConfirmModal.isPermanent);
+    } else if (deleteConfirmModal.type === 'restore' && deleteConfirmModal.orderId) {
+      executeRestoreOrder(deleteConfirmModal.orderId);
+    }
+    setDeleteConfirmModal({ ...deleteConfirmModal, isOpen: false });
   };
 
   const exportToCSV = () => {
@@ -429,6 +576,7 @@ const CMSOrders: React.FC = () => {
       'Customer',
       'Email',
       'Outlet',
+      'Status',
       'Items (Redeemed/Total)',
       'Gross Sales',
       'Disc. Voucher',
@@ -452,10 +600,11 @@ const CMSOrders: React.FC = () => {
       return [
         order.order_number || order.id.slice(0, 8),
         paymentConfig.label,
-        formatDateTimeCMS(order.created_at),
+        formatDateTimeExcel(order.created_at),
         order.users?.name || 'Guest',
         order.users?.email || '-',
         order.outlets?.name || '-',
+        order.deleted_at ? 'Deleted' : 'Active',
         ratio.text,
         `RM ${(order.gross_sales || order.subtotal || 0).toFixed(2)}`,
         `-RM ${(order.discount_amount || 0).toFixed(2)}`,
@@ -527,7 +676,7 @@ const CMSOrders: React.FC = () => {
 
         rows.push([
           order.order_number || order.id.slice(0, 8),
-          formatDateTimeCMS(order.created_at),
+          formatDateTimeExcel(order.created_at),
           order.users?.name || 'Guest',
           order.outlets?.name || '-',
           item.product_name,
@@ -566,12 +715,12 @@ const CMSOrders: React.FC = () => {
   };
 
   const getFulfillmentStatusConfig = (status: string) => {
-    const configs: Record<string, { bg: string; text: string; icon: any }> = {
-      waiting_payment: { bg: 'bg-gray-100', text: 'text-gray-700', icon: Clock },
-      ready: { bg: 'bg-blue-100', text: 'text-blue-700', icon: Package },
-      completed: { bg: 'bg-green-100', text: 'text-green-700', icon: CheckCircle },
-      cancelled: { bg: 'bg-red-100', text: 'text-red-700', icon: XCircle },
-      refunded: { bg: 'bg-orange-100', text: 'text-orange-700', icon: DollarSign }
+    const configs: Record<string, { bg: string; text: string; icon: any; label: string }> = {
+      waiting_payment: { bg: 'bg-gray-100', text: 'text-gray-700', icon: Clock, label: 'Waiting Payment' },
+      ready: { bg: 'bg-blue-100', text: 'text-blue-700', icon: Package, label: 'Ready' },
+      completed: { bg: 'bg-green-100', text: 'text-green-700', icon: CheckCircle, label: 'Completed' },
+      cancelled: { bg: 'bg-red-100', text: 'text-red-700', icon: XCircle, label: 'Cancelled' },
+      refunded: { bg: 'bg-orange-100', text: 'text-orange-700', icon: DollarSign, label: 'Refunded' }
     };
     return configs[status] || configs.waiting_payment;
   };
@@ -608,7 +757,7 @@ const CMSOrders: React.FC = () => {
 
   const stats = {
     total: filteredOrders.length,
-    pending: filteredOrders.filter(o => o.status === 'pending').length,
+    pending: filteredOrders.filter(o => o.status === 'waiting_payment').length,
     ready: filteredOrders.filter(o => o.status === 'ready').length,
     completed: filteredOrders.filter(o => o.status === 'completed').length,
     revenue: filteredOrders.filter(o => o.payment_type === 'payment').reduce((sum, o) => sum + parseFloat(o.total_amount.toString()), 0),
@@ -635,10 +784,32 @@ const CMSOrders: React.FC = () => {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-black text-gray-900 mb-2">Orders Management</h1>
+            <h1 className="text-3xl font-black text-gray-900 mb-2">Orders Management {viewDeleted && <span className="text-red-500">(Trash)</span>}</h1>
             <p className="text-gray-600 font-medium">View and manage all customer orders</p>
           </div>
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => {
+                setViewDeleted(!viewDeleted);
+                setSelectedOrderIds(new Set());
+              }}
+              className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all shadow-lg ${viewDeleted
+                ? 'bg-gray-800 text-white hover:bg-gray-900'
+                : 'bg-white text-red-600 border-2 border-red-200 hover:bg-red-50'
+                }`}
+            >
+              {viewDeleted ? (
+                <>
+                  <ShoppingBag className="w-5 h-5" />
+                  View Active Orders
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-5 h-5" />
+                  View Trash
+                </>
+              )}
+            </button>
             <button
               onClick={() => navigate('/cms/ai-insights')}
               className="relative flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-500 via-pink-500 to-blue-500 text-white rounded-xl font-bold hover:scale-105 transition-all shadow-lg overflow-hidden group"
@@ -1064,7 +1235,7 @@ const CMSOrders: React.FC = () => {
                           </div>
                         </td>
                         <td className="px-4 py-4">
-                          <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold ${fulfillmentStatusConfig.bgColor} ${fulfillmentStatusConfig.color} w-fit`}>
+                          <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold ${fulfillmentStatusConfig.bg} ${fulfillmentStatusConfig.text} w-fit`}>
                             <FulfillmentStatusIcon className="w-3 h-3" />
                             {fulfillmentStatusConfig.label}
                           </span>
@@ -1093,6 +1264,19 @@ const CMSOrders: React.FC = () => {
                             >
                               <Trash2 className="w-4 h-4 text-red-600" />
                             </button>
+                            {viewDeleted && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  restoreOrder(order.id);
+                                }}
+                                className="p-2 hover:bg-green-50 rounded-lg transition-colors"
+                                title="Restore Order"
+                                disabled={deleting}
+                              >
+                                <RotateCcw className="w-4 h-4 text-green-600" />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -1117,7 +1301,7 @@ const CMSOrders: React.FC = () => {
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-black text-gray-900">Order Details</h2>
               <div className="flex items-center gap-2">
-                {(selectedOrder.status === 'confirmed' || selectedOrder.status === 'ready' || selectedOrder.status === 'completed') && (
+                {(selectedOrder.status === 'waiting_payment' || selectedOrder.status === 'ready' || selectedOrder.status === 'completed') && (
                   <button
                     onClick={() => {
                       setReceiptOrderId(selectedOrder.id);
@@ -1508,6 +1692,35 @@ const CMSOrders: React.FC = () => {
                 </div>
               </div>
 
+              <div className="border-t border-gray-200 pt-4">
+                <h3 className="text-lg font-black text-gray-900 mb-4">Payment Status</h3>
+                <div className="flex items-center gap-2">
+                  {['pending', 'paid', 'failed'].map((status) => {
+                    const isCurrentStatus = selectedOrder.payment_status === status;
+                    const statusConfig = getPaymentStatusConfig(status as PaymentStatus);
+                    const displayLabel = status.charAt(0).toUpperCase() + status.slice(1);
+                    return (
+                      <button
+                        key={status}
+                        onClick={() => updatePaymentStatus(selectedOrder.id, status)}
+                        disabled={updatingStatus || isCurrentStatus}
+                        className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all text-sm ${isCurrentStatus
+                          ? `${statusConfig.bgColor} ${statusConfig.color} border-2 ${statusConfig.bgColor.replace('bg-', 'border-')}`
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          } ${updatingStatus ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        <div className="flex items-center justify-center gap-2">
+                          <statusConfig.icon className="w-4 h-4" />
+                          {displayLabel}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+
+
               {selectedOrder.notes && (
                 <div className="border-t border-gray-200 pt-4">
                   <h3 className="text-lg font-black text-gray-900 mb-2">Notes</h3>
@@ -1532,6 +1745,71 @@ const CMSOrders: React.FC = () => {
             setReceiptOrderId(null);
           }}
         />
+      )}
+
+      {/* Custom Confirmation Modal */}
+      {deleteConfirmModal.isOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div className="flex flex-col items-center text-center">
+              <div className={`p-4 rounded-full mb-4 ${deleteConfirmModal.type === 'restore'
+                ? 'bg-gradient-to-br from-green-100 to-green-200'
+                : 'bg-gradient-to-br from-red-100 to-red-200'
+                }`}>
+                {deleteConfirmModal.type === 'restore' ? (
+                  <RotateCcw className="w-8 h-8 text-green-600" />
+                ) : (
+                  <AlertTriangle className="w-8 h-8 text-red-600" />
+                )}
+              </div>
+
+              <h3 className="text-xl font-black text-gray-900 mb-2">
+                {deleteConfirmModal.isFallback
+                  ? 'Soft Delete Skipped'
+                  : deleteConfirmModal.type === 'restore'
+                    ? 'Restore Order?'
+                    : deleteConfirmModal.isPermanent
+                      ? 'Permanently Delete?'
+                      : 'Move to Trash?'}
+              </h3>
+
+              <p className="text-gray-600 font-medium mb-6">
+                {deleteConfirmModal.isFallback
+                  ? `The "Trash" feature (soft delete) requires a database update. Do you want to permanently delete ${deleteConfirmModal.type === 'bulk' ? `these ${deleteConfirmModal.count} orders` : 'this order'} instead? This cannot be undone.`
+                  : deleteConfirmModal.type === 'restore'
+                    ? 'This order will be moved back to the active orders list.'
+                    : deleteConfirmModal.isPermanent
+                      ? `This action CANNOT be undone. This will permanently remove ${deleteConfirmModal.type === 'bulk' ? `all ${deleteConfirmModal.count} selected orders` : 'this order'} and all related records.`
+                      : `This will move ${deleteConfirmModal.type === 'bulk' ? `all ${deleteConfirmModal.count} selected orders` : 'this order'} to the trash. You can restore them later.`}
+              </p>
+
+              <div className="flex items-center gap-3 w-full">
+                <button
+                  onClick={() => setDeleteConfirmModal({ ...deleteConfirmModal, isOpen: false })}
+                  className="flex-1 py-3 px-4 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmAction}
+                  disabled={deleting}
+                  className={`flex-1 py-3 px-4 text-white font-bold rounded-xl shadow-lg transform transition-all hover:scale-105 active:scale-95 ${deleteConfirmModal.type === 'restore'
+                    ? 'bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600'
+                    : 'bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600'
+                    }`}
+                >
+                  {deleting
+                    ? 'Processing...'
+                    : deleteConfirmModal.type === 'restore'
+                      ? 'Restore Order'
+                      : deleteConfirmModal.isPermanent
+                        ? 'Delete Forever'
+                        : 'Move to Trash'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </CMSLayout>
   );

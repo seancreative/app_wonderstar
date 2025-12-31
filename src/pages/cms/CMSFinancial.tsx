@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import CMSLayout from '../../components/cms/CMSLayout';
-import { DollarSign, TrendingUp, Calendar, Download, CreditCard, Wallet, ShoppingBag, RefreshCw, FileSpreadsheet, Gift, ChevronLeft, ChevronRight } from 'lucide-react';
+import { DollarSign, TrendingUp, Calendar, Download, CreditCard, Wallet, ShoppingBag, RefreshCw, FileSpreadsheet, Gift, ChevronLeft, ChevronRight, PiggyBank, Users } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatDateTimeCMS } from '../../utils/dateFormatter';
+import { getAllUsers, type WPayUser } from '../../lib/wpayApi';
 
 interface FinancialStats {
   totalRevenue: number;
@@ -42,12 +43,19 @@ const CMSFinancial: React.FC = () => {
   const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [methodFilter, setMethodFilter] = useState<string>('all');
-  const [paymentTypeFilter, setPaymentTypeFilter] = useState<string>('payment');
+  const [paymentTypeFilter, setPaymentTypeFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 20;
 
+  // New state for Laravel API data
+  const [wpayUsers, setWpayUsers] = useState<WPayUser[]>([]);
+  const [totalWalletBalance, setTotalWalletBalance] = useState(0);
+  const [totalLifetimeTopups, setTotalLifetimeTopups] = useState(0);
+  const [totalWallets, setTotalWallets] = useState(0);
+
   useEffect(() => {
     loadFinancialStats();
+    loadWPayUsers();
   }, [dateRange, quickFilter]);
 
   useEffect(() => {
@@ -74,6 +82,27 @@ const CMSFinancial: React.FC = () => {
       setDateRange({ start: monthStart.toISOString().split('T')[0], end: '' });
     } else {
       setDateRange({ start: '', end: '' });
+    }
+  };
+
+  // Fetch users from Laravel API
+  const loadWPayUsers = async () => {
+    try {
+      const { users } = await getAllUsers();
+      setWpayUsers(users);
+      setTotalWallets(users.length);
+
+      // Calculate total balance and lifetime topups
+      let totalBalance = 0;
+      let totalTopups = 0;
+      users.forEach(user => {
+        totalBalance += parseFloat(String(user.wbalance || 0)) + parseFloat(String(user.bonus || 0));
+        totalTopups += parseFloat(String(user.lifetime_topups || 0));
+      });
+      setTotalWalletBalance(totalBalance);
+      setTotalLifetimeTopups(totalTopups);
+    } catch (error) {
+      console.error('Error loading WPay users:', error);
     }
   };
 
@@ -251,8 +280,9 @@ const CMSFinancial: React.FC = () => {
     }
   };
 
-  // Client-side filtering
+  // Client-side filtering - only show payment and topup types (income transactions)
   const filteredTransactions = recentTransactions
+    .filter(txn => txn.payment_type === 'payment' || txn.payment_type === 'topup') // Only income types
     .filter(txn => statusFilter === 'all' || txn.payment_status === statusFilter)
     .filter(txn => methodFilter === 'all' || txn.payment_method === methodFilter)
     .filter(txn => paymentTypeFilter === 'all' || txn.payment_type === paymentTypeFilter);
@@ -308,8 +338,14 @@ const CMSFinancial: React.FC = () => {
       ['Period:', periodText, '', '', '', ''],
       ['Generated:', new Date().toLocaleString('en-MY'), '', '', '', ''],
       ['', '', '', '', '', ''],
+      ['--- KEY METRICS ---', '', '', '', '', ''],
+      ['Total Sales (from Orders)', `RM ${stats.totalRevenue.toFixed(2)}`, '', '', '', ''],
+      ['Total Wallet Topups (Count)', totalWallets.toString(), '', '', '', ''],
+      ['Total Wallet Topups (Amount)', `RM ${totalLifetimeTopups.toFixed(2)}`, '', '', '', ''],
+      ['Total W-Balance Spent', `RM ${stats.wBalanceDeductions.toFixed(2)}`, '', '', '', ''],
+      ['Total Current Balance', `RM ${totalWalletBalance.toFixed(2)}`, '', '', '', ''],
+      ['', '', '', '', '', ''],
       ['--- REVENUE BREAKDOWN ---', '', '', '', '', ''],
-      ['Total Revenue', `RM ${stats.totalRevenue.toFixed(2)}`, '', '', '', ''],
       ['Monthly Revenue', `RM ${stats.monthlyRevenue.toFixed(2)}`, '', '', '', ''],
       ['Weekly Revenue', `RM ${stats.weeklyRevenue.toFixed(2)}`, '', '', '', ''],
       ['Today Revenue', `RM ${stats.todayRevenue.toFixed(2)}`, '', '', '', ''],
@@ -366,7 +402,7 @@ const CMSFinancial: React.FC = () => {
           </div>
           <div className="flex items-center gap-3">
             <button
-              onClick={() => { loadFinancialStats(); loadTransactions(); }}
+              onClick={() => { loadFinancialStats(); loadTransactions(); loadWPayUsers(); }}
               className="flex items-center gap-2 px-4 py-3 bg-white border-2 border-gray-300 text-gray-700 rounded-xl font-bold hover:bg-gray-50 transition-colors"
             >
               <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
@@ -454,7 +490,9 @@ const CMSFinancial: React.FC = () => {
           </div>
         </div>
 
+        {/* KEY 4 METRICS - From Laravel API */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* 0. Total Sales */}
           <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-2xl border-2 border-green-200 p-6">
             <div className="flex items-start justify-between mb-4">
               <div className="p-3 bg-white rounded-xl shadow-sm">
@@ -462,11 +500,53 @@ const CMSFinancial: React.FC = () => {
               </div>
               <TrendingUp className="w-5 h-5 text-green-600" />
             </div>
-            <p className="text-sm font-bold text-green-700 mb-1">Total Revenue</p>
+            <p className="text-sm font-bold text-green-700 mb-1">0. Total Sales</p>
             <p className="text-3xl font-black text-green-900">RM {stats.totalRevenue.toFixed(2)}</p>
             <p className="text-xs text-green-700 mt-2">{stats.totalOrders} orders</p>
           </div>
 
+          {/* 1. Total Wallet Topups */}
+          <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl border-2 border-blue-200 p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div className="p-3 bg-white rounded-xl shadow-sm">
+                <Wallet className="w-6 h-6 text-blue-600" />
+              </div>
+              <span className="text-xs font-bold text-blue-600 bg-blue-200 px-2 py-1 rounded-full">
+                {totalWallets} wallets
+              </span>
+            </div>
+            <p className="text-sm font-bold text-blue-700 mb-1">1. Total Wallet Topups</p>
+            <p className="text-3xl font-black text-blue-900">RM {totalLifetimeTopups.toFixed(2)}</p>
+            <p className="text-xs text-blue-700 mt-2">Since launch (from WPay API)</p>
+          </div>
+
+          {/* 2. Total Spent (W-Balance Deductions) */}
+          <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-2xl border-2 border-purple-200 p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div className="p-3 bg-white rounded-xl shadow-sm">
+                <ShoppingBag className="w-6 h-6 text-purple-600" />
+              </div>
+            </div>
+            <p className="text-sm font-bold text-purple-700 mb-1">2. Total Spent</p>
+            <p className="text-3xl font-black text-purple-900">RM {stats.wBalanceDeductions.toFixed(2)}</p>
+            <p className="text-xs text-purple-700 mt-2">W-Balance deductions</p>
+          </div>
+
+          {/* 3. Total Balance */}
+          <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-2xl border-2 border-orange-200 p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div className="p-3 bg-white rounded-xl shadow-sm">
+                <PiggyBank className="w-6 h-6 text-orange-600" />
+              </div>
+            </div>
+            <p className="text-sm font-bold text-orange-700 mb-1">3. Total Balance</p>
+            <p className="text-3xl font-black text-orange-900">RM {totalWalletBalance.toFixed(2)}</p>
+            <p className="text-xs text-orange-700 mt-2">Current balance (from WPay API)</p>
+          </div>
+        </div>
+
+        {/* Original Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl border-2 border-blue-200 p-6">
             <div className="flex items-start justify-between mb-4">
               <div className="p-3 bg-white rounded-xl shadow-sm">
@@ -499,6 +579,17 @@ const CMSFinancial: React.FC = () => {
             <p className="text-3xl font-black text-orange-900">RM {stats.todayRevenue.toFixed(2)}</p>
             <p className="text-xs text-orange-700 mt-2">Today's earnings</p>
           </div>
+
+          <div className="bg-gradient-to-br from-teal-50 to-teal-100 rounded-2xl border-2 border-teal-200 p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div className="p-3 bg-white rounded-xl shadow-sm">
+                <ShoppingBag className="w-6 h-6 text-teal-600" />
+              </div>
+            </div>
+            <p className="text-sm font-bold text-teal-700 mb-1">Avg Order Value</p>
+            <p className="text-3xl font-black text-teal-900">RM {stats.averageOrderValue.toFixed(2)}</p>
+            <p className="text-xs text-teal-700 mt-2">Per transaction</p>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -510,7 +601,7 @@ const CMSFinancial: React.FC = () => {
             </div>
             <p className="text-sm font-bold text-yellow-700 mb-1">W Balance Topups</p>
             <p className="text-3xl font-black text-yellow-900">RM {stats.walletTopups.toFixed(2)}</p>
-            <p className="text-xs text-yellow-700 mt-2">Customer topups</p>
+            <p className="text-xs text-yellow-700 mt-2">Customer topups (Supabase)</p>
           </div>
 
           <div className="bg-gradient-to-br from-rose-50 to-rose-100 rounded-2xl border-2 border-rose-200 p-6">
@@ -524,17 +615,6 @@ const CMSFinancial: React.FC = () => {
             <p className="text-xs text-rose-700 mt-2">Awaiting completion</p>
           </div>
 
-          <div className="bg-gradient-to-br from-teal-50 to-teal-100 rounded-2xl border-2 border-teal-200 p-6">
-            <div className="flex items-start justify-between mb-4">
-              <div className="p-3 bg-white rounded-xl shadow-sm">
-                <ShoppingBag className="w-6 h-6 text-teal-600" />
-              </div>
-            </div>
-            <p className="text-sm font-bold text-teal-700 mb-1">Avg Order Value</p>
-            <p className="text-3xl font-black text-teal-900">RM {stats.averageOrderValue.toFixed(2)}</p>
-            <p className="text-xs text-teal-700 mt-2">Per transaction</p>
-          </div>
-
           <div className="bg-gradient-to-br from-cyan-50 to-cyan-100 rounded-2xl border-2 border-cyan-200 p-6">
             <div className="flex items-start justify-between mb-4">
               <div className="p-3 bg-white rounded-xl shadow-sm">
@@ -546,17 +626,6 @@ const CMSFinancial: React.FC = () => {
             <p className="text-xs text-cyan-700 mt-2">Payment success</p>
           </div>
 
-          <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl border-2 border-blue-200 p-6">
-            <div className="flex items-start justify-between mb-4">
-              <div className="p-3 bg-white rounded-xl shadow-sm">
-                <Wallet className="w-6 h-6 text-blue-600" />
-              </div>
-            </div>
-            <p className="text-sm font-bold text-blue-700 mb-1">W-Balance Deductions</p>
-            <p className="text-3xl font-black text-blue-900">RM {stats.wBalanceDeductions.toFixed(2)}</p>
-            <p className="text-xs text-blue-700 mt-2">Wallet deductions</p>
-          </div>
-
           <div className="bg-gradient-to-br from-fuchsia-50 to-fuchsia-100 rounded-2xl border-2 border-fuchsia-200 p-6">
             <div className="flex items-start justify-between mb-4">
               <div className="p-3 bg-white rounded-xl shadow-sm">
@@ -566,6 +635,80 @@ const CMSFinancial: React.FC = () => {
             <p className="text-sm font-bold text-fuchsia-700 mb-1">Stamp Redemptions</p>
             <p className="text-3xl font-black text-fuchsia-900">{stats.stampRedemptions}</p>
             <p className="text-xs text-fuchsia-700 mt-2">Free orders redeemed</p>
+          </div>
+        </div>
+
+        {/* User Balances from WPay API */}
+        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+          <div className="p-6 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-black text-gray-900">User Wallet Balances</h2>
+                <p className="text-sm text-gray-600 mt-1">{wpayUsers.length} users from Laravel WPay API</p>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="text-right">
+                  <p className="text-sm font-bold text-gray-600">Total Balance</p>
+                  <p className="text-lg font-black text-green-600">RM {totalWalletBalance.toFixed(2)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-bold text-gray-600">Lifetime Topups</p>
+                  <p className="text-lg font-black text-blue-600">RM {totalLifetimeTopups.toFixed(2)}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="overflow-x-auto max-h-64">
+            <table className="w-full">
+              <thead className="bg-gray-50 sticky top-0">
+                <tr>
+                  <th className="text-left px-4 py-3 text-xs font-bold text-gray-900 uppercase">Email</th>
+                  <th className="text-right px-4 py-3 text-xs font-bold text-gray-900 uppercase">W-Balance</th>
+                  <th className="text-right px-4 py-3 text-xs font-bold text-gray-900 uppercase">Bonus</th>
+                  <th className="text-right px-4 py-3 text-xs font-bold text-gray-900 uppercase">Stars</th>
+                  <th className="text-center px-4 py-3 text-xs font-bold text-gray-900 uppercase">Tier</th>
+                  <th className="text-right px-4 py-3 text-xs font-bold text-gray-900 uppercase">Lifetime Topups</th>
+                </tr>
+              </thead>
+              <tbody>
+                {wpayUsers.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-8 text-center">
+                      <Users className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                      <p className="text-gray-600 font-medium">No users found</p>
+                    </td>
+                  </tr>
+                ) : (
+                  wpayUsers.map((user) => {
+                    const tierColors: Record<string, string> = {
+                      bronze: 'bg-orange-100 text-orange-700',
+                      silver: 'bg-gray-200 text-gray-700',
+                      gold: 'bg-yellow-100 text-yellow-700',
+                      platinum: 'bg-purple-100 text-purple-700',
+                      vip: 'bg-red-100 text-red-700'
+                    };
+                    const wbalance = parseFloat(String(user.wbalance || 0));
+                    const bonus = parseFloat(String(user.bonus || 0));
+                    const stars = parseInt(String(user.stars || 0));
+                    const lifetimeTopups = parseFloat(String(user.lifetime_topups || 0));
+                    return (
+                      <tr key={user.id} className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">{user.email}</td>
+                        <td className="px-4 py-3 text-sm text-right font-bold text-green-700">RM {wbalance.toFixed(2)}</td>
+                        <td className="px-4 py-3 text-sm text-right font-bold text-blue-700">RM {bonus.toFixed(2)}</td>
+                        <td className="px-4 py-3 text-sm text-right text-gray-600">{stars}</td>
+                        <td className="px-4 py-3 text-center">
+                          <span className={`px-2 py-1 rounded-full text-xs font-bold uppercase ${tierColors[user.tier_type] || tierColors.bronze}`}>
+                            {user.tier_type || 'bronze'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-right text-gray-600">RM {lifetimeTopups.toFixed(2)}</td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
 
@@ -616,8 +759,7 @@ const CMSFinancial: React.FC = () => {
                 >
                   <option value="all">All Types</option>
                   <option value="payment">💳 Payment</option>
-                  <option value="deduction">💰 W-Balance</option>
-                  <option value="redemption">🎁 Redemption</option>
+                  <option value="topup">💵 Topup</option>
                 </select>
                 <select
                   value={statusFilter}
@@ -675,8 +817,7 @@ const CMSFinancial: React.FC = () => {
 
                     const typeConfig: Record<string, { bg: string; text: string; label: string }> = {
                       payment: { bg: 'bg-green-100', text: 'text-green-700', label: 'Payment' },
-                      deduction: { bg: 'bg-blue-100', text: 'text-blue-700', label: 'W-Balance' },
-                      redemption: { bg: 'bg-purple-100', text: 'text-purple-700', label: 'Redemption' }
+                      topup: { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Topup' }
                     };
                     const typeStyle = typeConfig[txn.payment_type] || { bg: 'bg-gray-100', text: 'text-gray-700', label: txn.payment_type || 'N/A' };
 

@@ -555,6 +555,7 @@ export interface ShopOrder {
   fnbstatus?: 'preparing' | 'ready' | 'collected' | 'cancelled';
   fnbstatus_updated_at?: string;
   fnbstatus_updated_by?: string;
+  deleted_at?: string;
 }
 
 export interface OrderItemRedemption {
