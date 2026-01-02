@@ -995,6 +995,7 @@ const ShopCheckout: React.FC = () => {
         customer_phone: user.phone || '',
         product_name: `Shop order ${orderNumber} - ${cartItems.length} item(s)`,
         metadata: {
+          user_id: user.id, // Required for Supabase sync
           outlet_id: outletId,
           outlet_name: selectedOutlet?.name,
           items_count: cartItems.length,
@@ -1378,6 +1379,7 @@ const ShopCheckout: React.FC = () => {
           customer_phone: user.phone || '',
           product_name: `Free order ${orderNumber} - ${cartItems.length} item(s)`,
           metadata: {
+            user_id: user.id, // Required for Supabase sync
             outlet_id: outletId,
             outlet_name: selectedOutlet?.name,
             items_count: cartItems.length,

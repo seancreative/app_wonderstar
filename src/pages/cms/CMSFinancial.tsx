@@ -53,10 +53,22 @@ const CMSFinancial: React.FC = () => {
   const [totalLifetimeTopups, setTotalLifetimeTopups] = useState(0);
   const [totalWallets, setTotalWallets] = useState(0);
 
+  // State for WPay Topup Transactions from Laravel API
+  const [wpayTopups, setWpayTopups] = useState<any[]>([]);
+  const [topupsLoading, setTopupsLoading] = useState(false);
+  const [topupDateRange, setTopupDateRange] = useState({ start: '', end: '' });
+  const [topupCurrentPage, setTopupCurrentPage] = useState(1);
+  const TOPUP_PAGE_SIZE = 20;
+
   useEffect(() => {
     loadFinancialStats();
     loadWPayUsers();
+    loadWPayTopups();
   }, [dateRange, quickFilter]);
+
+  useEffect(() => {
+    loadWPayTopups();
+  }, [topupDateRange]);
 
   useEffect(() => {
     loadTransactions();
@@ -103,6 +115,40 @@ const CMSFinancial: React.FC = () => {
       setTotalLifetimeTopups(totalTopups);
     } catch (error) {
       console.error('Error loading WPay users:', error);
+    }
+  };
+
+  // Fetch topup transactions from Laravel API
+  const loadWPayTopups = async () => {
+    try {
+      setTopupsLoading(true);
+      const response = await fetch('https://app.aigenius.com.my/wpay/admin/transactions?payment_category=topup&status=success');
+      const data = await response.json();
+
+      let filtered = data.transactions || [];
+
+      // Apply date filtering
+      if (topupDateRange.start) {
+        filtered = filtered.filter((t: any) => {
+          const txnDate = new Date(t.created_at);
+          return txnDate >= new Date(topupDateRange.start);
+        });
+      }
+      if (topupDateRange.end) {
+        filtered = filtered.filter((t: any) => {
+          const txnDate = new Date(t.created_at);
+          const endDate = new Date(topupDateRange.end);
+          endDate.setHours(23, 59, 59, 999);
+          return txnDate <= endDate;
+        });
+      }
+
+      setWpayTopups(filtered);
+      setTopupCurrentPage(1); // Reset to first page
+    } catch (error) {
+      console.error('Error loading WPay topups:', error);
+    } finally {
+      setTopupsLoading(false);
     }
   };
 
@@ -295,10 +341,16 @@ const CMSFinancial: React.FC = () => {
   const exportToExcel = () => {
     // Create CSV content with BOM for Excel to recognize UTF-8
     const BOM = '\uFEFF';
-    const csvHeaders = ['Date', 'Time', 'Payment Method', 'Payment Type', 'Amount (RM)', 'Status', 'User Name', 'User Email', 'Order ID'];
-    const rows = filteredTransactions.map(txn => {
+
+    const sections = [];
+
+    // Section 1: Supabase Transactions (existing)
+    sections.push(['=== SUPABASE TRANSACTIONS (Shop Orders) ===', '', '', '', '', '', '', '', '', '', '']);
+    sections.push(['Date', 'Time', 'Payment Method', 'Payment Type', 'Amount (RM)', 'Status', 'User Name', 'User Email', 'Order ID', '', '']);
+
+    filteredTransactions.forEach(txn => {
       const date = new Date(txn.created_at);
-      return [
+      sections.push([
         date.toLocaleDateString('en-MY'),
         date.toLocaleTimeString('en-MY'),
         txn.payment_method || 'N/A',
@@ -307,14 +359,46 @@ const CMSFinancial: React.FC = () => {
         txn.payment_status || 'N/A',
         txn.users?.name || 'Unknown',
         txn.users?.email || 'N/A',
-        txn.id
-      ];
+        txn.id,
+        '',
+        ''
+      ]);
     });
 
-    const csv = BOM + [
-      csvHeaders.join(','),
-      ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-    ].join('\n');
+    // Empty row separator
+    sections.push(['', '', '', '', '', '', '', '', '', '', '']);
+
+    // Section 2: WPay Topup Transactions (from Laravel API)
+    sections.push(['=== WPAY TOPUP TRANSACTIONS (Laravel WPay API) ===', '', '', '', '', '', '', '', '', '', '']);
+    sections.push(['Order ID', 'Fiuu Txn ID', 'Date', 'Time', 'Email', 'Amount Paid (RM)', 'Topup Amount (RM)', 'Bonus (RM)', 'Stars', 'Method', 'Status']);
+
+    wpayTopups.forEach(topup => {
+      const date = new Date(topup.created_at);
+      sections.push([
+        topup.order_id || 'N/A',
+        topup.fiuu_transaction_id || 'N/A',
+        date.toLocaleDateString('en-MY'),
+        date.toLocaleTimeString('en-MY'),
+        topup.email || 'N/A',
+        parseFloat(topup.amount || 0).toFixed(2),
+        parseFloat(topup.topup_amount || 0).toFixed(2),
+        parseFloat(topup.bonus_awarded || 0).toFixed(2),
+        topup.stars_awarded || 0,
+        topup.payment_method || 'online',
+        topup.status || 'N/A'
+      ]);
+    });
+
+    // Summary section
+    sections.push(['', '', '', '', '', '', '', '', '', '', '']);
+    sections.push(['=== SUMMARY ===', '', '', '', '', '', '', '', '', '', '']);
+    sections.push(['Total Supabase Transactions:', filteredTransactions.length, '', '', '', '', '', '', '', '', '']);
+    sections.push(['Total Supabase Amount:', `RM ${filteredTransactions.reduce((sum, t) => sum + parseFloat(t.total_amount || 0), 0).toFixed(2)}`, '', '', '', '', '', '', '', '', '']);
+    sections.push(['Total WPay Topups:', wpayTopups.length, '', '', '', '', '', '', '', '', '']);
+    sections.push(['Total WPay Topup Amount Paid:', `RM ${wpayTopups.reduce((sum, t) => sum + parseFloat(t.amount || 0), 0).toFixed(2)}`, '', '', '', '', '', '', '', '', '']);
+    sections.push(['Total WPay Topup Amount Credited:', `RM ${wpayTopups.reduce((sum, t) => sum + parseFloat(t.topup_amount || 0), 0).toFixed(2)}`, '', '', '', '', '', '', '', '', '']);
+
+    const csv = BOM + sections.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
     const url = window.URL.createObjectURL(blob);
@@ -402,10 +486,10 @@ const CMSFinancial: React.FC = () => {
           </div>
           <div className="flex items-center gap-3">
             <button
-              onClick={() => { loadFinancialStats(); loadTransactions(); loadWPayUsers(); }}
+              onClick={() => { loadFinancialStats(); loadTransactions(); loadWPayUsers(); loadWPayTopups(); }}
               className="flex items-center gap-2 px-4 py-3 bg-white border-2 border-gray-300 text-gray-700 rounded-xl font-bold hover:bg-gray-50 transition-colors"
             >
-              <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-5 h-5 ${loading || topupsLoading ? 'animate-spin' : ''}`} />
               Refresh
             </button>
             <button
@@ -710,6 +794,176 @@ const CMSFinancial: React.FC = () => {
               </tbody>
             </table>
           </div>
+        </div>
+
+        {/* WPay Topup Transactions Table - Direct from Laravel API */}
+        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+          <div className="p-6 border-b border-gray-200">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-black text-gray-900">WPay Topup Transactions</h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  {wpayTopups.length} topup transactions from Laravel WPay API
+                  {topupsLoading && ' (Loading...)'}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <Calendar className="w-5 h-5 text-gray-500" />
+                <input
+                  type="date"
+                  value={topupDateRange.start}
+                  onChange={(e) => setTopupDateRange({ ...topupDateRange, start: e.target.value })}
+                  className="px-3 py-2 border-2 border-gray-300 rounded-lg font-medium text-sm focus:border-blue-500 focus:outline-none"
+                  placeholder="Start date"
+                />
+                <span className="text-gray-500 font-bold">to</span>
+                <input
+                  type="date"
+                  value={topupDateRange.end}
+                  onChange={(e) => setTopupDateRange({ ...topupDateRange, end: e.target.value })}
+                  className="px-3 py-2 border-2 border-gray-300 rounded-lg font-medium text-sm focus:border-blue-500 focus:outline-none"
+                  placeholder="End date"
+                />
+                <button
+                  onClick={() => {
+                    setTopupDateRange({ start: '', end: '' });
+                    loadWPayTopups();
+                  }}
+                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-bold hover:bg-gray-200 transition-colors text-sm"
+                >
+                  Clear Filters
+                </button>
+              </div>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gradient-to-r from-amber-50 to-orange-50">
+                <tr>
+                  <th className="text-left px-4 py-3 text-xs font-bold text-gray-900 uppercase">Order ID</th>
+                  <th className="text-left px-4 py-3 text-xs font-bold text-gray-900 uppercase">Fiuu Txn ID</th>
+                  <th className="text-left px-4 py-3 text-xs font-bold text-gray-900 uppercase">Date</th>
+                  <th className="text-left px-4 py-3 text-xs font-bold text-gray-900 uppercase">Email</th>
+                  <th className="text-right px-4 py-3 text-xs font-bold text-green-600 uppercase">Amount Paid</th>
+                  <th className="text-right px-4 py-3 text-xs font-bold text-blue-600 uppercase">Topup Amount</th>
+                  <th className="text-right px-4 py-3 text-xs font-bold text-purple-600 uppercase">Bonus</th>
+                  <th className="text-right px-4 py-3 text-xs font-bold text-amber-600 uppercase">Stars</th>
+                  <th className="text-center px-4 py-3 text-xs font-bold text-gray-900 uppercase">Method</th>
+                  <th className="text-center px-4 py-3 text-xs font-bold text-gray-900 uppercase">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {topupsLoading ? (
+                  <tr>
+                    <td colSpan={10} className="px-6 py-12 text-center">
+                      <div className="flex items-center justify-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                        <span className="ml-3 text-gray-600 font-medium">Loading topup transactions...</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : wpayTopups.length === 0 ? (
+                  <tr>
+                    <td colSpan={10} className="px-6 py-12 text-center">
+                      <DollarSign className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                      <p className="text-gray-600 font-medium">No topup transactions found</p>
+                      <p className="text-xs text-gray-500 mt-2">Try adjusting the date filters</p>
+                    </td>
+                  </tr>
+                ) : (
+                  wpayTopups
+                    .slice((topupCurrentPage - 1) * TOPUP_PAGE_SIZE, topupCurrentPage * TOPUP_PAGE_SIZE)
+                    .map((topup: any) => {
+                      const amountPaid = parseFloat(topup.amount || 0);
+                      const topupAmount = parseFloat(topup.topup_amount || 0);
+                      const bonusAwarded = parseFloat(topup.bonus_awarded || 0);
+                      const starsAwarded = parseInt(topup.stars_awarded || 0);
+
+                      return (
+                        <tr key={topup.id} className="border-b border-gray-100 hover:bg-amber-50/50">
+                          <td className="px-4 py-3">
+                            <span className="text-sm font-bold text-blue-600">{topup.order_id}</span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="text-xs text-gray-600 font-mono">{topup.fiuu_transaction_id || '-'}</span>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-900">
+                            {formatDateTimeCMS(topup.created_at)}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="text-sm font-medium text-gray-900">{topup.email || 'N/A'}</span>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-right font-bold text-green-700">
+                            RM {amountPaid.toFixed(2)}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-right font-bold text-blue-700">
+                            RM {topupAmount.toFixed(2)}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-right font-bold text-purple-700">
+                            {bonusAwarded > 0 ? `RM ${bonusAwarded.toFixed(2)}` : '-'}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-right font-bold text-amber-700">
+                            {starsAwarded > 0 ? starsAwarded : '-'}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <span className="text-xs font-medium text-gray-600 uppercase">
+                              {topup.payment_method || 'online'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-bold ${
+                              topup.status === 'success' ? 'bg-green-100 text-green-700' :
+                              topup.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                              'bg-red-100 text-red-700'
+                            }`}>
+                              {topup.status || 'N/A'}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })
+                )}
+              </tbody>
+            </table>
+          </div>
+          {wpayTopups.length > 0 && (
+            <div className="p-4 bg-amber-50 border-t border-gray-200">
+              <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+                <div className="flex items-center gap-4">
+                  <span className="text-sm text-gray-600">
+                    Showing {wpayTopups.length === 0 ? 0 : (topupCurrentPage - 1) * TOPUP_PAGE_SIZE + 1} to{' '}
+                    {Math.min(topupCurrentPage * TOPUP_PAGE_SIZE, wpayTopups.length)} of {wpayTopups.length} topups
+                  </span>
+                  <span className="text-sm font-bold text-green-700 border-l pl-4 border-gray-300">
+                    Total Paid: RM {wpayTopups.reduce((sum, t) => sum + parseFloat(t.amount || 0), 0).toFixed(2)}
+                  </span>
+                  <span className="text-sm font-bold text-blue-700 border-l pl-4 border-gray-300">
+                    Total Topped Up: RM {wpayTopups.reduce((sum, t) => sum + parseFloat(t.topup_amount || 0), 0).toFixed(2)}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setTopupCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={topupCurrentPage === 1}
+                    className="p-2 border border-gray-300 rounded-lg hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <ChevronLeft className="w-5 h-5 text-gray-600" />
+                  </button>
+                  <span className="text-sm font-medium text-gray-700">
+                    Page {topupCurrentPage} of {Math.ceil(wpayTopups.length / TOPUP_PAGE_SIZE) || 1}
+                  </span>
+                  <button
+                    onClick={() => setTopupCurrentPage(prev => Math.min(prev + 1, Math.ceil(wpayTopups.length / TOPUP_PAGE_SIZE)))}
+                    disabled={topupCurrentPage >= Math.ceil(wpayTopups.length / TOPUP_PAGE_SIZE) || wpayTopups.length === 0}
+                    className="p-2 border border-gray-300 rounded-lg hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <ChevronRight className="w-5 h-5 text-gray-600" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
