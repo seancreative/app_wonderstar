@@ -91,16 +91,18 @@ const EggGachaPage: React.FC = () => {
     <div className="min-h-screen pb-28 bg-gradient-to-b from-purple-50 via-pink-50 to-orange-50">
       <PageHeader />
 
+      {/* First Banner - Gacha Info */}
       <div
-        className="fixed left-0 right-0 z-40 top-[72px] max-w-md mx-auto"
+        className="fixed left-0 right-0 z-40 max-w-md mx-auto"
         style={{
+          top: '64px',
           background: 'linear-gradient(135deg, #FF1493 0%, #FF69B4 100%)',
           border: '4px solid #000',
           borderTop: 'none',
           boxShadow: '0 4px 0 #000'
         }}
       >
-        <div className="px-4 py-3 flex items-center gap-3">
+        <div className="px-3 py-2 flex items-center gap-2 flex-wrap">
           <button
             onClick={() => navigate('/home')}
             className="rounded-lg"
@@ -174,9 +176,9 @@ const EggGachaPage: React.FC = () => {
             </div>
           )}
           <h1
-            className="font-bold uppercase flex-1"
+            className="font-bold uppercase flex-1 min-w-0"
             style={{
-              fontSize: '0.8rem',
+              fontSize: 'clamp(0.5rem, 2vw, 0.8rem)',
               color: '#FFFF00',
               letterSpacing: '0.05rem',
               textShadow: '-2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000',
@@ -189,26 +191,27 @@ const EggGachaPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Second Banner - Share for Free Spin */}
       {!allTasksCompleted && (
         <button
           onClick={() => navigate('/share-gacha')}
           className="fixed left-0 right-0 z-30 max-w-md mx-auto"
           style={{
-            top: '158px',
+            top: '160px',
             background: 'linear-gradient(135deg, #00FFFF 0%, #00CED1 100%)',
             border: '4px solid #000',
             borderTop: 'none',
             boxShadow: '0 4px 0 #000',
-            padding: '0.75rem',
+            padding: '0.65rem 0.75rem',
             cursor: 'pointer'
           }}
         >
           <div className="flex items-center justify-center gap-2">
-            <Share2 className="w-5 h-5" style={{ color: '#000' }} />
+            <Share2 className="w-4 h-4 sm:w-5 sm:h-5" style={{ color: '#000' }} />
             <span
               style={{
                 fontFamily: "'Press Start 2P', 'Courier New', monospace",
-                fontSize: '0.7rem',
+                fontSize: 'clamp(0.55rem, 1.8vw, 0.7rem)',
                 color: '#000',
                 textShadow: '1px 1px 0 #FFF',
                 textTransform: 'uppercase'
@@ -216,12 +219,12 @@ const EggGachaPage: React.FC = () => {
             >
               SHARE & FREE SPIN!
             </span>
-            <span style={{ fontSize: '1.2rem' }}>🎁</span>
+            <span style={{ fontSize: '1.1rem' }}>🎁</span>
           </div>
         </button>
       )}
 
-      <div className={allTasksCompleted ? "mt-[128px] px-4" : "mt-[180px] px-4"} id="egg-gacha-app">
+      <div className={allTasksCompleted ? "mt-[135px] px-4" : "mt-[215px] px-4"} id="egg-gacha-app">
         <EggGachaMachine
           key={machineKey}
           onReset={handleReset}

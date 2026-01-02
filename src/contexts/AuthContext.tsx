@@ -165,6 +165,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(authData.session);
       // No localStorage - session managed by Supabase Auth
 
+      // Create WPay user account in Laravel backend
+      try {
+        const wpayResponse = await fetch('https://app.aigenius.com.my/wpay/admin/users', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: email,
+            supabase_user_id: userData.id,
+            name: name,
+            phone: phone,
+          }),
+        });
+
+        if (!wpayResponse.ok) {
+          console.warn('[Signup] Failed to create WPay user:', await wpayResponse.text());
+        } else {
+          console.log('[Signup] WPay user created successfully');
+        }
+      } catch (wpayError) {
+        console.error('[Signup] Error creating WPay user:', wpayError);
+        // Don't fail signup if WPay creation fails
+      }
+
       await supabase.from('notifications').insert({
         user_id: userData.id,
         title: 'Welcome to WonderStars!',
