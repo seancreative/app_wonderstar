@@ -281,13 +281,42 @@ export const getOrGenerateReceipt = async (orderId: string): Promise<ReceiptData
     });
 
     if (shopOrderError || !shopOrders || shopOrders.length === 0) {
-      console.error('[ReceiptService] Shop order not found for wpay order:', wpayOrderId, shopOrderError);
-      throw new Error(`Receipt not available for this topup. The order record (${wpayOrderId}) was not found in the system. This may be an older topup from before receipts were enabled.`);
-    }
+      console.warn('[ReceiptService] Shop order not found for wpay order, will create from wallet_transaction:', wpayOrderId);
 
-    order = shopOrders[0];
-    actualOrderId = order.id;
-    console.log('[ReceiptService] Found shop_order via wallet_transaction:', actualOrderId);
+      // Create a minimal shop_order structure from wallet_transaction for receipt generation
+      // This handles cases where shop_order creation failed but wallet_transaction exists
+      const amount = walletTxn.metadata?.topup_amount || walletTxn.amount || 0;
+      const bonusAmount = walletTxn.metadata?.bonus_amount || 0;
+
+      order = {
+        id: orderId, // Use wallet_transaction ID as fallback
+        order_number: wpayOrderId,
+        payment_type: 'topup',
+        total_amount: amount,
+        subtotal: amount,
+        gross_sales: amount,
+        discount_amount: 0,
+        bonus_discount_amount: 0,
+        permanent_discount_amount: 0,
+        payment_method: 'card',
+        payment_status: 'paid',
+        status: 'completed',
+        receipt_data: null,
+        receipt_number: null,
+        receipt_generated_at: null,
+        metadata: {
+          topup_amount: amount,
+          bonus_awarded: bonusAmount,
+          is_topup: true
+        }
+      };
+      actualOrderId = orderId;
+      console.log('[ReceiptService] Created virtual shop_order from wallet_transaction');
+    } else {
+      order = shopOrders[0];
+      actualOrderId = order.id;
+      console.log('[ReceiptService] Found shop_order via wallet_transaction:', actualOrderId);
+    }
   }
 
   console.log('[ReceiptService] Order found:', order.id, 'Has receipt:', !!order.receipt_data);
