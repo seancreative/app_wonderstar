@@ -235,6 +235,7 @@ const MyQR: React.FC = () => {
           .from('shop_orders')
           .select('*, outlets(name, location), payment_method')
           .eq('user_id', user.id)
+          .neq('payment_type', 'topup')
           .order('created_at', { ascending: false })
           .limit(50),
         supabase
@@ -242,7 +243,6 @@ const MyQR: React.FC = () => {
           .select('*')
           .eq('user_id', user.id)
           .eq('transaction_type', 'topup')
-          .eq('status', 'success')
           .order('created_at', { ascending: false })
           .limit(50),
       ]);
@@ -343,18 +343,24 @@ const MyQR: React.FC = () => {
 
       if (walletTopupsResult.data) {
         walletTopupsResult.data.forEach((topup: any) => {
+          const topupAmount = topup.amount || 0;
+          const bonusAmount = topup.bonus_amount || 0;
+          const orderNumber = topup.metadata?.order_number || topup.wpay_order_id;
+
           codes.push({
             id: topup.id,
             type: 'wallet_topup',
             qrCode: '',
             title: `💰 Wallet Top-up`,
-            description: `RM${topup.amount.toFixed(2)} added to wallet`,
+            description: `RM${topupAmount.toFixed(2)} added to wallet`,
             status: 'completed',
             expiresAt: null,
             metadata: {
-              ...topup.metadata,
               transaction_id: topup.id,
-              bonus_amount: topup.bonus_amount || 0
+              bonus_amount: bonusAmount,
+              topup_amount: topupAmount,
+              order_number: orderNumber,
+              wpay_order_id: topup.wpay_order_id
             },
             items: [],
             redemptions: [],
@@ -362,8 +368,8 @@ const MyQR: React.FC = () => {
             outlet_name: 'W Balance',
             outlet_location: '',
             created_at: topup.created_at,
-            amount: topup.amount,
-            payment_method: topup.metadata?.payment_method || 'card'
+            amount: topupAmount,
+            payment_method: 'online'
           });
         });
       }
@@ -637,29 +643,20 @@ const MyQR: React.FC = () => {
             <button
               onClick={(e) => {
                 e.stopPropagation();
+                console.log('[MyQR] View Receipt clicked:', {
+                  type: qr.type,
+                  id: qr.id,
+                  metadata: qr.metadata
+                });
+
                 if (qr.type === 'wallet_topup') {
-                  const orderNumber = qr.metadata?.order_number;
-                  if (orderNumber) {
-                    console.log('[MyQR] Finding shop_order for topup:', orderNumber);
-                    supabase
-                      .from('shop_orders')
-                      .select('id')
-                      .eq('order_number', orderNumber)
-                      .single()
-                      .then(({ data }) => {
-                        if (data) {
-                          setReceiptOrderId(data.id);
-                          setShowReceiptModal(true);
-                        }
-                      });
-                  }
+                  // For wallet topups, just pass the wallet_transaction ID
+                  // The receiptService will handle looking up the shop_order
+                  console.log('[MyQR] Opening receipt for wallet topup ID:', qr.id);
+                  setReceiptOrderId(qr.id);
+                  setShowReceiptModal(true);
                 } else {
-                  console.log('[MyQR] Opening receipt for order:', {
-                    id: qr.id,
-                    title: qr.title,
-                    type: qr.type,
-                    metadata: qr.metadata
-                  });
+                  console.log('[MyQR] Opening receipt for shop order:', qr.id);
                   setReceiptOrderId(qr.id);
                   setShowReceiptModal(true);
                 }
@@ -1018,27 +1015,17 @@ const MyQR: React.FC = () => {
                 {shouldShowReceipt(selectedQR) && (
                   <button
                     onClick={() => {
-                      if (selectedQR.type === 'wallet_topup') {
-                        const orderNumber = selectedQR.metadata?.order_number;
-                        if (orderNumber) {
-                          supabase
-                            .from('shop_orders')
-                            .select('id')
-                            .eq('order_number', orderNumber)
-                            .single()
-                            .then(({ data }) => {
-                              if (data) {
-                                setReceiptOrderId(data.id);
-                                setShowReceiptModal(true);
-                                setSelectedQR(null);
-                              }
-                            });
-                        }
-                      } else {
-                        setReceiptOrderId(selectedQR.id);
-                        setShowReceiptModal(true);
-                        setSelectedQR(null);
-                      }
+                      console.log('[MyQR Modal] View Receipt clicked:', {
+                        type: selectedQR.type,
+                        id: selectedQR.id,
+                        metadata: selectedQR.metadata
+                      });
+
+                      // For both wallet topups and orders, just pass the ID
+                      // The receiptService will handle wallet_transaction lookups
+                      setReceiptOrderId(selectedQR.id);
+                      setShowReceiptModal(true);
+                      setSelectedQR(null);
                     }}
                     className="w-full py-3 bg-blue-600 text-white rounded-xl font-black hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
                   >

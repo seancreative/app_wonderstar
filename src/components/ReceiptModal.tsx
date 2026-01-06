@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Printer, Loader2, AlertCircle } from 'lucide-react';
+import { X, Printer, Loader2, AlertCircle, FileText } from 'lucide-react';
 import OrderReceipt from './OrderReceipt';
+import EInvoiceRequestModal from './EInvoiceRequestModal';
 import type { ReceiptData } from '../types/database';
 import { getOrGenerateReceipt } from '../services/receiptService';
 
@@ -13,20 +14,31 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ orderId, onClose }) => {
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showEInvoiceModal, setShowEInvoiceModal] = useState(false);
+  const [actualOrderId, setActualOrderId] = useState<string>(orderId);
 
   useEffect(() => {
     loadReceipt();
   }, [orderId]);
 
   const loadReceipt = async () => {
+    console.log('[ReceiptModal] Loading receipt for order ID:', orderId);
     setLoading(true);
     setError(null);
 
     try {
       const data = await getOrGenerateReceipt(orderId);
+      console.log('[ReceiptModal] Receipt data loaded:', data);
+
+      // If actualOrderId is present, use it for e-invoice (this happens when orderId is a wallet_transaction ID)
+      if (data.actualOrderId) {
+        setActualOrderId(data.actualOrderId);
+        console.log('[ReceiptModal] Using actual order ID for e-invoice:', data.actualOrderId);
+      }
+
       setReceiptData(data);
     } catch (err: any) {
-      console.error('Error loading receipt:', err);
+      console.error('[ReceiptModal] Error loading receipt:', err);
       setError(err.message || 'Failed to load receipt. Please try again.');
     } finally {
       setLoading(false);
@@ -39,7 +51,7 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ orderId, onClose }) => {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 overflow-y-auto"
+      className="fixed inset-0 z-[55] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 overflow-y-auto"
       onClick={onClose}
     >
       <div
@@ -50,13 +62,22 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ orderId, onClose }) => {
           <h2 className="text-xl font-black text-gray-900">Order Receipt</h2>
           <div className="flex items-center gap-2">
             {receiptData && (
-              <button
-                onClick={handlePrint}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors"
-              >
-                <Printer className="w-4 h-4" />
-                Print Receipt
-              </button>
+              <>
+                <button
+                  onClick={() => setShowEInvoiceModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-xl font-bold hover:scale-105 transition-transform"
+                >
+                  <FileText className="w-4 h-4" />
+                  Request E-Invoice
+                </button>
+                <button
+                  onClick={handlePrint}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors"
+                >
+                  <Printer className="w-4 h-4" />
+                  Print Receipt
+                </button>
+              </>
             )}
             <button
               onClick={onClose}
@@ -136,6 +157,14 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ orderId, onClose }) => {
           }
         }
       `}</style>
+
+      {showEInvoiceModal && receiptData && (
+        <EInvoiceRequestModal
+          orderId={actualOrderId}
+          orderNumber={receiptData.order.order_number}
+          onClose={() => setShowEInvoiceModal(false)}
+        />
+      )}
     </div>
   );
 };

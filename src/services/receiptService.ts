@@ -111,7 +111,32 @@ export const generateReceiptData = async (orderId: string): Promise<ReceiptData>
 
   const items: ReceiptItem[] = [];
 
-  if (order.items && Array.isArray(order.items)) {
+  // Handle topup orders differently
+  if (order.payment_type === 'topup') {
+    const metadata = order.metadata || {};
+    const topupAmount = metadata.topup_amount || order.total_amount || 0;
+    const bonusAmount = metadata.bonus_awarded || 0;
+
+    items.push({
+      name: `Wallet Top-up`,
+      quantity: 1,
+      unit_price: topupAmount,
+      modifiers: [],
+      item_subtotal: topupAmount,
+      item_total: topupAmount
+    });
+
+    if (bonusAmount > 0) {
+      items.push({
+        name: `Bonus Credited`,
+        quantity: 1,
+        unit_price: bonusAmount,
+        modifiers: [],
+        item_subtotal: bonusAmount,
+        item_total: bonusAmount
+      });
+    }
+  } else if (order.items && Array.isArray(order.items)) {
     order.items.forEach((item: any) => {
       const modifiers = parseOrderModifiers(item);
 
@@ -162,9 +187,9 @@ export const generateReceiptData = async (orderId: string): Promise<ReceiptData>
       phone: customer.phone || ''
     },
     outlet: {
-      name: outlet.name || 'Unknown Outlet',
-      location: outlet.location || '',
-      address: outlet.address || ''
+      name: order.payment_type === 'topup' ? 'W Balance' : (outlet.name || 'Unknown Outlet'),
+      location: order.payment_type === 'topup' ? 'Online' : (outlet.location || ''),
+      address: order.payment_type === 'topup' ? '' : (outlet.address || '')
     },
     order: {
       order_number: order.order_number || order.id,
@@ -174,8 +199,8 @@ export const generateReceiptData = async (orderId: string): Promise<ReceiptData>
     },
     items: items,
     pricing: {
-      subtotal: order.subtotal || 0,
-      gross_sales: order.gross_sales || 0,
+      subtotal: order.subtotal || order.total_amount || 0,
+      gross_sales: order.gross_sales || order.total_amount || 0,
       voucher_discount: order.discount_amount || 0,
       voucher_code: order.voucher_code,
       tier_discount: order.permanent_discount_amount || 0,
@@ -186,7 +211,7 @@ export const generateReceiptData = async (orderId: string): Promise<ReceiptData>
     payment: {
       method: getPaymentMethodLabel(order.payment_method, order.payment_type),
       type: order.payment_type || 'payment',
-      status: order.status === 'completed' ? 'PAID' : 'PENDING'
+      status: order.payment_status === 'paid' ? 'PAID' : (order.status === 'completed' ? 'PAID' : 'PENDING')
     }
   };
 
@@ -209,34 +234,73 @@ export const saveReceiptToOrder = async (orderId: string, receiptData: ReceiptDa
   }
 };
 
-export const getOrGenerateReceipt = async (orderId: string): Promise<ReceiptData> => {
+export const getOrGenerateReceipt = async (orderId: string): Promise<ReceiptData & { actualOrderId?: string }> => {
   console.log('[ReceiptService] Loading receipt for order ID:', orderId);
 
-  const { data: order, error: orderError } = await supabase
+  // First try to fetch from shop_orders
+  let { data: order, error: orderError } = await supabase
     .from('shop_orders')
-    .select('id, receipt_data, receipt_number, receipt_generated_at')
+    .select('id, receipt_data, receipt_number, receipt_generated_at, payment_type')
     .eq('id', orderId)
     .single();
 
-  if (orderError) {
-    console.error('[ReceiptService] Error fetching order:', orderError);
-    throw new Error(`Order not found: ${orderError.message}`);
-  }
+  let actualOrderId = orderId;
 
-  if (!order) {
-    console.error('[ReceiptService] No order data returned for ID:', orderId);
-    throw new Error('Order not found');
+  // If not found in shop_orders, check if it's a wallet_transaction ID
+  if (orderError || !order) {
+    console.log('[ReceiptService] Not found in shop_orders, checking wallet_transactions...');
+
+    const { data: walletTxn, error: walletError } = await supabase
+      .from('wallet_transactions')
+      .select('id, metadata')
+      .eq('id', orderId)
+      .single();
+
+    if (walletError || !walletTxn) {
+      console.error('[ReceiptService] Order not found in either table:', orderError, walletError);
+      throw new Error('Order not found');
+    }
+
+    // Get the wpay_order_id from metadata and find the shop_order
+    const wpayOrderId = walletTxn.metadata?.order_number;
+    if (!wpayOrderId) {
+      throw new Error('Wallet transaction missing order number');
+    }
+
+    console.log('[ReceiptService] Searching for shop_order with order_number:', wpayOrderId);
+
+    const { data: shopOrders, error: shopOrderError } = await supabase
+      .from('shop_orders')
+      .select('id, receipt_data, receipt_number, receipt_generated_at, payment_type, order_number')
+      .eq('order_number', wpayOrderId);
+
+    console.log('[ReceiptService] Shop order query result:', {
+      data: shopOrders,
+      error: shopOrderError,
+      count: shopOrders?.length
+    });
+
+    if (shopOrderError || !shopOrders || shopOrders.length === 0) {
+      console.error('[ReceiptService] Shop order not found for wpay order:', wpayOrderId, shopOrderError);
+      throw new Error(`Receipt not available for this topup. The order record (${wpayOrderId}) was not found in the system. This may be an older topup from before receipts were enabled.`);
+    }
+
+    order = shopOrders[0];
+    actualOrderId = order.id;
+    console.log('[ReceiptService] Found shop_order via wallet_transaction:', actualOrderId);
   }
 
   console.log('[ReceiptService] Order found:', order.id, 'Has receipt:', !!order.receipt_data);
 
+  let receiptData: ReceiptData;
+
   if (order.receipt_data && order.receipt_number) {
-    return order.receipt_data as ReceiptData;
+    receiptData = order.receipt_data as ReceiptData;
+  } else {
+    receiptData = await generateReceiptData(order.id);
+    await saveReceiptToOrder(order.id, receiptData);
   }
 
-  const receiptData = await generateReceiptData(orderId);
-
-  await saveReceiptToOrder(orderId, receiptData);
-
-  return receiptData;
+  // Attach the actual order ID for e-invoice purposes
+  return { ...receiptData, actualOrderId };
 };
