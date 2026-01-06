@@ -71,28 +71,12 @@ const getPaymentMethodLabel = (paymentMethod?: string, paymentType?: string): st
   return paymentMethod || 'N/A';
 };
 
-export const generateReceiptData = async (orderId: string): Promise<ReceiptData> => {
-  console.log('[ReceiptService] Generating receipt data for order ID:', orderId);
-
-  const { data: order, error: orderError } = await supabase
-    .from('shop_orders')
-    .select(`
-      *,
-      user:users!user_id (id, name, email, phone),
-      outlet:outlets (id, name, location, address)
-    `)
-    .eq('id', orderId)
-    .single();
-
-  if (orderError) {
-    console.error('[ReceiptService] Error in generateReceiptData:', orderError);
-    throw new Error(`Failed to generate receipt: ${orderError.message}`);
-  }
-
-  if (!order) {
-    console.error('[ReceiptService] No order found in generateReceiptData for ID:', orderId);
-    throw new Error('Order not found');
-  }
+const generateReceiptFromOrder = async (order: any): Promise<ReceiptData> => {
+  console.log('[ReceiptService] Generating receipt from order data:', {
+    id: order.id,
+    order_number: order.order_number,
+    payment_type: order.payment_type
+  });
 
   console.log('[ReceiptService] Order data loaded:', {
     id: order.id,
@@ -218,6 +202,32 @@ export const generateReceiptData = async (orderId: string): Promise<ReceiptData>
   return receiptData;
 };
 
+export const generateReceiptData = async (orderId: string): Promise<ReceiptData> => {
+  console.log('[ReceiptService] Generating receipt data for order ID:', orderId);
+
+  const { data: order, error: orderError } = await supabase
+    .from('shop_orders')
+    .select(`
+      *,
+      user:users!user_id (id, name, email, phone),
+      outlet:outlets (id, name, location, address)
+    `)
+    .eq('id', orderId)
+    .single();
+
+  if (orderError) {
+    console.error('[ReceiptService] Error in generateReceiptData:', orderError);
+    throw new Error(`Failed to generate receipt: ${orderError.message}`);
+  }
+
+  if (!order) {
+    console.error('[ReceiptService] No order found in generateReceiptData for ID:', orderId);
+    throw new Error('Order not found');
+  }
+
+  return generateReceiptFromOrder(order);
+};
+
 export const saveReceiptToOrder = async (orderId: string, receiptData: ReceiptData): Promise<void> => {
   const { error } = await supabase
     .from('shop_orders')
@@ -322,12 +332,21 @@ export const getOrGenerateReceipt = async (orderId: string): Promise<ReceiptData
   console.log('[ReceiptService] Order found:', order.id, 'Has receipt:', !!order.receipt_data);
 
   let receiptData: ReceiptData;
+  const isVirtualOrder = order.id === orderId && !order.receipt_number; // Virtual order created from wallet_transaction
 
   if (order.receipt_data && order.receipt_number) {
     receiptData = order.receipt_data as ReceiptData;
   } else {
-    receiptData = await generateReceiptData(order.id);
-    await saveReceiptToOrder(order.id, receiptData);
+    // For virtual orders (created from wallet_transaction), generate directly without saving
+    // For real orders, generate and save to database
+    receiptData = await generateReceiptFromOrder(order);
+
+    if (!isVirtualOrder) {
+      // Only save if this is a real shop_order in the database
+      await saveReceiptToOrder(order.id, receiptData);
+    } else {
+      console.log('[ReceiptService] Skipping save for virtual order');
+    }
   }
 
   // Attach the actual order ID for e-invoice purposes
