@@ -62,12 +62,30 @@ interface OrderWithDetails extends ShopOrder {
   order_item_redemptions?: OrderItemRedemption[];
 }
 
+// WPay Topup Transaction interface
+interface WPayTopupTransaction {
+  id: string;
+  order_id: string;
+  email: string;
+  amount: number;
+  topup_amount: number;
+  bonus_awarded: number;
+  stars_awarded: number;
+  payment_type: string;
+  status: string;
+  created_at: string;
+  wpay_user?: {
+    name?: string;
+  };
+}
+
 const CMSOrders: React.FC = () => {
   const navigate = useNavigate();
   const toast = useToast();
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [receiptOrderId, setReceiptOrderId] = useState<string | null>(null);
   const [orders, setOrders] = useState<OrderWithDetails[]>([]);
+  const [wpayTopups, setWpayTopups] = useState<WPayTopupTransaction[]>([]);
   const [outlets, setOutlets] = useState<{ id: string; name: string; location?: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -101,6 +119,7 @@ const CMSOrders: React.FC = () => {
   useEffect(() => {
     loadOutlets();
     loadOrders();
+    loadWPayTopups();
 
     // Subscribe to real-time changes on order_item_redemptions
     const redemptionChannel = supabase
@@ -123,6 +142,22 @@ const CMSOrders: React.FC = () => {
       supabase.removeChannel(redemptionChannel);
     };
   }, [statusFilter, paymentStatusFilter, paymentTypeFilter, outletFilter, viewDeleted]);
+
+  // Load WPay topup transactions from Laravel API
+  const loadWPayTopups = async () => {
+    try {
+      const response = await fetch('https://app.aigenius.com.my/wpay/admin/transactions?payment_category=topup&status=success');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.wpay_status === 'success' && data.transactions) {
+          setWpayTopups(data.transactions);
+          console.log('[CMSOrders] Loaded WPay topups:', data.transactions.length);
+        }
+      }
+    } catch (error) {
+      console.error('[CMSOrders] Error loading WPay topups:', error);
+    }
+  };
 
   const loadOutlets = async () => {
     try {
@@ -253,6 +288,26 @@ const CMSOrders: React.FC = () => {
 
     return matchesSearch && matchesDateStart && matchesDateEnd && matchesDeleted;
   });
+
+  // Filter WPay topups based on search and date filters
+  const filteredWPayTopups = wpayTopups.filter(topup => {
+    const matchesSearch = searchTerm === '' ||
+      topup.order_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      topup.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      topup.wpay_user?.name?.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const topupDate = new Date(topup.created_at);
+    const matchesDateStart = !dateFilter.start || topupDate >= new Date(dateFilter.start);
+    const matchesDateEnd = !dateFilter.end || topupDate <= new Date(dateFilter.end);
+
+    return matchesSearch && matchesDateStart && matchesDateEnd;
+  });
+
+  // Get existing order IDs from Supabase to avoid duplicates
+  const supabaseOrderIds = new Set(orders.map(o => o.order_number));
+
+  // Filter out WPay topups that already exist in Supabase orders
+  const uniqueWPayTopups = filteredWPayTopups.filter(topup => !supabaseOrderIds.has(topup.order_id));
 
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
     setUpdatingStatus(true);
@@ -755,16 +810,27 @@ const CMSOrders: React.FC = () => {
     };
   };
 
+  // Helper function to safely parse amount
+  const safeParseAmount = (amount: any): number => {
+    const parsed = parseFloat(String(amount || 0));
+    return isNaN(parsed) ? 0 : parsed;
+  };
+
+  // Calculate WPay topup stats
+  const wpayTopupsTotal = uniqueWPayTopups.reduce((sum, t) => sum + safeParseAmount(t.topup_amount || t.amount), 0);
+  const supabaseTopupsTotal = filteredOrders.filter(o => o.payment_type === 'topup').reduce((sum, o) => sum + safeParseAmount(o.total_amount), 0);
+  const supabaseTopupsCount = filteredOrders.filter(o => o.payment_type === 'topup').length;
+
   const stats = {
-    total: filteredOrders.length,
+    total: filteredOrders.length + (paymentTypeFilter === 'all' || paymentTypeFilter === 'topup' ? uniqueWPayTopups.length : 0),
     pending: filteredOrders.filter(o => o.status === 'waiting_payment').length,
     ready: filteredOrders.filter(o => o.status === 'ready').length,
     completed: filteredOrders.filter(o => o.status === 'completed').length,
-    revenue: filteredOrders.filter(o => o.payment_type === 'payment').reduce((sum, o) => sum + parseFloat(o.total_amount.toString()), 0),
-    deductions: filteredOrders.filter(o => o.payment_type === 'deduction').reduce((sum, o) => sum + parseFloat(o.total_amount.toString()), 0),
+    revenue: filteredOrders.filter(o => o.payment_type === 'payment').reduce((sum, o) => sum + safeParseAmount(o.total_amount), 0),
+    deductions: filteredOrders.filter(o => o.payment_type === 'deduction').reduce((sum, o) => sum + safeParseAmount(o.total_amount), 0),
     redemptions: filteredOrders.filter(o => o.payment_type === 'redemption').length,
-    topups: filteredOrders.filter(o => o.payment_type === 'topup').reduce((sum, o) => sum + parseFloat(o.total_amount.toString()), 0),
-    topupsCount: filteredOrders.filter(o => o.payment_type === 'topup').length
+    topups: supabaseTopupsTotal + wpayTopupsTotal,
+    topupsCount: supabaseTopupsCount + uniqueWPayTopups.length
   };
 
   const getPendingRedemptionsCount = (order: OrderWithDetails) => {
@@ -869,7 +935,7 @@ const CMSOrders: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-bold text-green-700 mb-1">Real Revenue</p>
-                <p className="text-2xl font-black text-green-900">RM {stats.revenue.toFixed(2)}</p>
+                <p className="text-2xl font-black text-green-900">RM {(stats.revenue || 0).toFixed(2)}</p>
               </div>
               <CreditCard className="w-12 h-12 text-green-500" />
             </div>
@@ -879,7 +945,7 @@ const CMSOrders: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-bold text-blue-700 mb-1">W Balance Deductions</p>
-                <p className="text-2xl font-black text-blue-900">RM {stats.deductions.toFixed(2)}</p>
+                <p className="text-2xl font-black text-blue-900">RM {(stats.deductions || 0).toFixed(2)}</p>
               </div>
               <Wallet className="w-12 h-12 text-blue-500" />
             </div>
@@ -909,8 +975,8 @@ const CMSOrders: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-bold text-amber-700 mb-1">Wallet Topups</p>
-                <p className="text-2xl font-black text-amber-900">RM {stats.topups.toFixed(2)}</p>
-                <p className="text-xs text-amber-600 mt-1">{stats.topupsCount} transactions</p>
+                <p className="text-2xl font-black text-amber-900">RM {(stats.topups || 0).toFixed(2)}</p>
+                <p className="text-xs text-amber-600 mt-1">{stats.topupsCount || 0} transactions</p>
               </div>
               <DollarSign className="w-12 h-12 text-amber-500" />
             </div>
@@ -1130,7 +1196,7 @@ const CMSOrders: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredOrders.length === 0 ? (
+                {filteredOrders.length === 0 && uniqueWPayTopups.length === 0 ? (
                   <tr>
                     <td colSpan={14} className="px-6 py-12 text-center">
                       <ShoppingBag className="w-16 h-16 text-gray-300 mx-auto mb-4" />
@@ -1306,6 +1372,97 @@ const CMSOrders: React.FC = () => {
                     );
                   })
                 )}
+                {/* Render WPay Topup Transactions (only when showing all or topup filter) */}
+                {(paymentTypeFilter === 'all' || paymentTypeFilter === 'topup') && !viewDeleted && uniqueWPayTopups.map((topup) => (
+                  <tr
+                    key={`wpay-${topup.id}`}
+                    className="border-b border-gray-100 hover:bg-amber-50/50 cursor-pointer bg-amber-50/20"
+                  >
+                    <td className="px-4 py-4">
+                      <input
+                        type="checkbox"
+                        disabled
+                        className="w-4 h-4 rounded border-gray-300 text-gray-400 cursor-not-allowed"
+                      />
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-sm font-bold text-blue-600 font-mono">
+                          {topup.order_id}
+                        </span>
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700 w-fit">
+                          <DollarSign className="w-3 h-3" />
+                          Topup (WPay)
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4">
+                      <p className="text-xs font-bold text-gray-900 font-mono">
+                        {formatDateTimeCMS(topup.created_at)}
+                      </p>
+                    </td>
+                    <td className="px-4 py-4">
+                      <div>
+                        <p className="text-sm font-bold text-gray-900">
+                          {topup.wpay_user?.name || topup.email?.split('@')[0] || 'Unknown'}
+                        </p>
+                        <p className="text-xs text-gray-600">{topup.email}</p>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4">
+                      <p className="text-sm font-bold text-gray-400">-</p>
+                    </td>
+                    <td className="px-4 py-4">
+                      <span className="inline-flex items-center justify-center px-3 py-1 rounded-lg text-sm font-bold bg-gray-100 text-gray-500 w-fit">
+                        N/A
+                      </span>
+                    </td>
+                    <td className="px-4 py-4 text-right">
+                      <span className="text-sm font-bold text-gray-900">
+                        {formatCurrency(topup.topup_amount || topup.amount)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4 text-right">
+                      <span className="text-sm font-bold text-gray-400">-</span>
+                    </td>
+                    <td className="px-4 py-4 text-right">
+                      <span className="text-sm font-bold text-purple-600">
+                        {topup.bonus_awarded > 0 ? formatCurrency(topup.bonus_awarded) : '-'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4 text-right">
+                      <span className="text-sm font-bold text-gray-400">-</span>
+                    </td>
+                    <td className="px-4 py-4 text-right">
+                      <div className="flex flex-col items-end gap-1">
+                        <span className="text-sm font-bold text-green-700">
+                          {formatCurrency(topup.amount)}
+                        </span>
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-700">
+                          <CreditCard className="w-3 h-3" />
+                          Online
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4">
+                      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold ${topup.status === 'success' ? 'bg-green-100 text-green-700' : topup.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'} w-fit`}>
+                        <CheckCircle className="w-3 h-3" />
+                        {topup.status === 'success' ? 'Paid' : topup.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4">
+                      <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700 w-fit">
+                        <CheckCircle className="w-3 h-3" />
+                        Completed
+                      </span>
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="flex items-center justify-center gap-2">
+                        <span className="text-xs text-gray-400">WPay Record</span>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
