@@ -280,7 +280,14 @@ const CMSOrders: React.FC = () => {
 
     const orderDate = new Date(order.created_at);
     const matchesDateStart = !dateFilter.start || orderDate >= new Date(dateFilter.start);
-    const matchesDateEnd = !dateFilter.end || orderDate <= new Date(dateFilter.end);
+    // Ensure end date includes the full day (23:59:59.999)
+    let endDateCheck = true;
+    if (dateFilter.end) {
+      const endDate = new Date(dateFilter.end);
+      endDate.setHours(23, 59, 59, 999);
+      endDateCheck = orderDate <= endDate;
+    }
+    const matchesDateEnd = endDateCheck;
 
     const matchesDeleted = viewDeleted
       ? !!order.deleted_at
@@ -298,7 +305,14 @@ const CMSOrders: React.FC = () => {
 
     const topupDate = new Date(topup.created_at);
     const matchesDateStart = !dateFilter.start || topupDate >= new Date(dateFilter.start);
-    const matchesDateEnd = !dateFilter.end || topupDate <= new Date(dateFilter.end);
+    // Ensure end date includes the full day (23:59:59.999)
+    let topupEndDateCheck = true;
+    if (dateFilter.end) {
+      const endDate = new Date(dateFilter.end);
+      endDate.setHours(23, 59, 59, 999);
+      topupEndDateCheck = topupDate <= endDate;
+    }
+    const matchesDateEnd = topupEndDateCheck;
 
     return matchesSearch && matchesDateStart && matchesDateEnd;
   });
@@ -363,16 +377,13 @@ const CMSOrders: React.FC = () => {
 
       console.log('[CMSOrders] Order updated successfully:', updatedData);
 
-      // Reload orders to reflect changes
-      await loadOrders();
-
-      // Update the selected order in the modal
+      // Update the selected order in the modal immediately (before reload)
       if (selectedOrder?.id === orderId) {
-        const updatedOrder = orders.find(o => o.id === orderId);
-        if (updatedOrder) {
-          setSelectedOrder({ ...updatedOrder, status: newStatus as any });
-        }
+        setSelectedOrder(prev => prev ? { ...prev, status: newStatus as any } : null);
       }
+
+      // Reload orders to reflect changes in the table
+      await loadOrders();
 
       console.log('[CMSOrders] Status update completed successfully');
     } catch (err: any) {
@@ -400,14 +411,14 @@ const CMSOrders: React.FC = () => {
       if (error) throw error;
 
       toast.success('Payment status updated successfully');
-      await loadOrders();
 
+      // Update the selected order in the modal immediately (before reload)
       if (selectedOrder?.id === orderId) {
-        const updatedOrder = orders.find(o => o.id === orderId);
-        if (updatedOrder) {
-          setSelectedOrder({ ...updatedOrder, payment_status: newStatus as any });
-        }
+        setSelectedOrder(prev => prev ? { ...prev, payment_status: newStatus as any } : null);
       }
+
+      // Reload orders to reflect changes in the table
+      await loadOrders();
     } catch (err: any) {
       console.error('Error updating payment status:', err);
       toast.error(`Failed to update payment status: ${err?.message}`);
@@ -676,18 +687,21 @@ const CMSOrders: React.FC = () => {
       ];
     });
 
-    const csv = [
+    // Add UTF-8 BOM for consistent Excel encoding across devices
+    const BOM = '\uFEFF';
+    const csv = BOM + [
       headers.join(','),
-      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+      ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
     ].join('\n');
 
-    const blob = new Blob([csv], { type: 'text/csv' });
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     const filterSuffix = paymentTypeFilter !== 'all' ? `-${paymentTypeFilter}` : '';
     a.download = `orders${filterSuffix}-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
+    window.URL.revokeObjectURL(url);
   };
 
   const exportDetailedCSV = () => {
@@ -755,18 +769,21 @@ const CMSOrders: React.FC = () => {
       });
     });
 
-    const csv = [
+    // Add UTF-8 BOM for consistent Excel encoding across devices
+    const BOM = '\uFEFF';
+    const csv = BOM + [
       headers.join(','),
-      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+      ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
     ].join('\n');
 
-    const blob = new Blob([csv], { type: 'text/csv' });
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     const filterSuffix = paymentTypeFilter !== 'all' ? `-${paymentTypeFilter}` : '';
     a.download = `orders-detailed${filterSuffix}-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
+    window.URL.revokeObjectURL(url);
   };
 
   const getFulfillmentStatusConfig = (status: string) => {

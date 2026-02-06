@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import CMSLayout from '../../components/cms/CMSLayout';
-import { DollarSign, TrendingUp, Calendar, Download, CreditCard, Wallet, ShoppingBag, RefreshCw, FileSpreadsheet, Gift, ChevronLeft, ChevronRight, PiggyBank, Users } from 'lucide-react';
+import { DollarSign, TrendingUp, Calendar, Download, CreditCard, Wallet, ShoppingBag, RefreshCw, FileSpreadsheet, Gift, ChevronLeft, ChevronRight, PiggyBank, Users, MapPin } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { formatDateTimeCMS } from '../../utils/dateFormatter';
+import { formatDateTimeCMS, formatDateTimeExcel } from '../../utils/dateFormatter';
 import { getAllUsers, type WPayUser } from '../../lib/wpayApi';
 
 interface FinancialStats {
@@ -60,10 +60,15 @@ const CMSFinancial: React.FC = () => {
   const [topupCurrentPage, setTopupCurrentPage] = useState(1);
   const TOPUP_PAGE_SIZE = 20;
 
+  // State for outlets
+  const [outlets, setOutlets] = useState<{ id: string; name: string }[]>([]);
+  const [outletFilter, setOutletFilter] = useState<string>('all');
+
   useEffect(() => {
     loadFinancialStats();
     loadWPayUsers();
     loadWPayTopups();
+    loadOutlets();
   }, [dateRange, quickFilter]);
 
   useEffect(() => {
@@ -272,6 +277,18 @@ const CMSFinancial: React.FC = () => {
     }
   };
 
+  const loadOutlets = async () => {
+    try {
+      const { data } = await supabase
+        .from('outlets')
+        .select('id, name')
+        .order('name');
+      setOutlets(data || []);
+    } catch (error) {
+      console.error('Error loading outlets:', error);
+    }
+  };
+
   const loadTransactions = async () => {
     try {
       setLoading(true);
@@ -280,7 +297,7 @@ const CMSFinancial: React.FC = () => {
       // This ensures we can calculate totals accurately for the filtered set
       let transactionsQuery = supabase
         .from('shop_orders')
-        .select('id, user_id, order_number, total_amount, gross_sales, discount_amount, bonus_discount_amount, created_at, payment_status, payment_method, payment_type, voucher_code')
+        .select('id, user_id, outlet_id, order_number, total_amount, gross_sales, discount_amount, bonus_discount_amount, created_at, payment_status, payment_method, payment_type, voucher_code')
         .order('created_at', { ascending: false })
         .limit(2000);
 
@@ -299,6 +316,7 @@ const CMSFinancial: React.FC = () => {
 
       // Manually fetch users to ensure data reliability (joins can sometimes be tricky with permissions or nulls)
       const userIds = [...new Set(transactions.map((t: any) => t.user_id).filter(Boolean))];
+      const outletIds = [...new Set(transactions.map((t: any) => t.outlet_id).filter(Boolean))];
 
       let usersMap = new Map();
       if (userIds.length > 0) {
@@ -312,9 +330,22 @@ const CMSFinancial: React.FC = () => {
         }
       }
 
+      let outletsMap = new Map();
+      if (outletIds.length > 0) {
+        const { data: outletsData } = await supabase
+          .from('outlets')
+          .select('id, name')
+          .in('id', outletIds);
+
+        if (outletsData) {
+          outletsMap = new Map(outletsData.map(o => [o.id, o]));
+        }
+      }
+
       const enrichedTransactions = transactions.map((t: any) => ({
         ...t,
-        users: usersMap.get(t.user_id) || { name: 'Guest', email: '-' }
+        users: usersMap.get(t.user_id) || { name: 'Guest', email: '-' },
+        outlets: outletsMap.get(t.outlet_id) || { name: '-' }
       }));
 
       setRecentTransactions(enrichedTransactions);
@@ -331,7 +362,8 @@ const CMSFinancial: React.FC = () => {
     .filter(txn => txn.payment_type === 'payment' || txn.payment_type === 'topup') // Only income types
     .filter(txn => statusFilter === 'all' || txn.payment_status === statusFilter)
     .filter(txn => methodFilter === 'all' || txn.payment_method === methodFilter)
-    .filter(txn => paymentTypeFilter === 'all' || txn.payment_type === paymentTypeFilter);
+    .filter(txn => paymentTypeFilter === 'all' || txn.payment_type === paymentTypeFilter)
+    .filter(txn => outletFilter === 'all' || txn.outlet_id === outletFilter);
 
   // Client-side pagination calculations
   const totalTransactions = filteredTransactions.length;
@@ -345,14 +377,13 @@ const CMSFinancial: React.FC = () => {
     const sections = [];
 
     // Section 1: Supabase Transactions (existing)
-    sections.push(['=== SUPABASE TRANSACTIONS (Shop Orders) ===', '', '', '', '', '', '', '', '', '', '']);
-    sections.push(['Date', 'Time', 'Payment Method', 'Payment Type', 'Amount (RM)', 'Status', 'User Name', 'User Email', 'Order ID', '', '']);
+    sections.push(['=== SUPABASE TRANSACTIONS (Shop Orders) ===', '', '', '', '', '', '', '', '', '', '', '']);
+    sections.push(['Date/Time', 'Outlet', 'Payment Method', 'Payment Type', 'Amount (RM)', 'Status', 'User Name', 'User Email', 'Order ID', '', '', '']);
 
     filteredTransactions.forEach(txn => {
-      const date = new Date(txn.created_at);
       sections.push([
-        date.toLocaleDateString('en-MY'),
-        date.toLocaleTimeString('en-MY'),
+        formatDateTimeExcel(txn.created_at),
+        txn.outlets?.name || '-',
         txn.payment_method || 'N/A',
         txn.payment_type || 'N/A',
         parseFloat(txn.total_amount || 0).toFixed(2),
@@ -360,6 +391,7 @@ const CMSFinancial: React.FC = () => {
         txn.users?.name || 'Unknown',
         txn.users?.email || 'N/A',
         txn.id,
+        '',
         '',
         ''
       ]);
@@ -369,23 +401,23 @@ const CMSFinancial: React.FC = () => {
     sections.push(['', '', '', '', '', '', '', '', '', '', '']);
 
     // Section 2: WPay Topup Transactions (from Laravel API)
-    sections.push(['=== WPAY TOPUP TRANSACTIONS (Laravel WPay API) ===', '', '', '', '', '', '', '', '', '', '']);
-    sections.push(['Order ID', 'Fiuu Txn ID', 'Date', 'Time', 'Email', 'Amount Paid (RM)', 'Topup Amount (RM)', 'Bonus (RM)', 'Stars', 'Method', 'Status']);
+    sections.push(['=== WPAY TOPUP TRANSACTIONS (Laravel WPay API) ===', '', '', '', '', '', '', '', '', '', '', '']);
+    sections.push(['Order ID', 'Fiuu Txn ID', 'Date/Time', 'Email', 'Amount Paid (RM)', 'Topup Amount (RM)', 'Bonus (RM)', 'Stars', 'Method', 'Status', '', '']);
 
     wpayTopups.forEach(topup => {
-      const date = new Date(topup.created_at);
       sections.push([
         topup.order_id || 'N/A',
         topup.fiuu_transaction_id || 'N/A',
-        date.toLocaleDateString('en-MY'),
-        date.toLocaleTimeString('en-MY'),
+        formatDateTimeExcel(topup.created_at),
         topup.email || 'N/A',
         parseFloat(topup.amount || 0).toFixed(2),
         parseFloat(topup.topup_amount || 0).toFixed(2),
         parseFloat(topup.bonus_awarded || 0).toFixed(2),
         topup.stars_awarded || 0,
         topup.payment_method || 'online',
-        topup.status || 'N/A'
+        topup.status || 'N/A',
+        '',
+        ''
       ]);
     });
 
@@ -1007,6 +1039,16 @@ const CMSFinancial: React.FC = () => {
               </div>
               <div className="flex flex-wrap items-center gap-3">
                 <select
+                  value={outletFilter}
+                  onChange={(e) => setOutletFilter(e.target.value)}
+                  className="px-4 py-2 border-2 border-gray-300 rounded-lg font-medium text-sm focus:border-blue-500 focus:outline-none"
+                >
+                  <option value="all">All Outlets</option>
+                  {outlets.map((outlet) => (
+                    <option key={outlet.id} value={outlet.id}>{outlet.name}</option>
+                  ))}
+                </select>
+                <select
                   value={paymentTypeFilter}
                   onChange={(e) => setPaymentTypeFilter(e.target.value)}
                   className="px-4 py-2 border-2 border-gray-300 rounded-lg font-medium text-sm focus:border-blue-500 focus:outline-none"
@@ -1046,6 +1088,7 @@ const CMSFinancial: React.FC = () => {
                 <tr>
                   <th className="text-left px-4 py-3 text-xs font-bold text-gray-900 uppercase">Order #</th>
                   <th className="text-left px-4 py-3 text-xs font-bold text-gray-900 uppercase">Date</th>
+                  <th className="text-left px-4 py-3 text-xs font-bold text-gray-900 uppercase">Outlet</th>
                   <th className="text-left px-4 py-3 text-xs font-bold text-gray-900 uppercase">Customer</th>
                   <th className="text-left px-4 py-3 text-xs font-bold text-gray-900 uppercase">Type</th>
                   <th className="text-left px-4 py-3 text-xs font-bold text-gray-900 uppercase">Method</th>
@@ -1058,7 +1101,7 @@ const CMSFinancial: React.FC = () => {
               <tbody>
                 {paginatedTransactions.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-6 py-12 text-center">
+                    <td colSpan={10} className="px-6 py-12 text-center">
                       <CreditCard className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                       <p className="text-gray-600 font-medium">No transactions match the selected filters</p>
                     </td>
@@ -1082,6 +1125,12 @@ const CMSFinancial: React.FC = () => {
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-900">
                           {formatDateTimeCMS(txn.created_at)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-sm text-gray-600 flex items-center gap-1">
+                            <MapPin className="w-3 h-3" />
+                            {txn.outlets?.name || '-'}
+                          </span>
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex flex-col">
