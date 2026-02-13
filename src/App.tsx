@@ -69,6 +69,7 @@ import CMSSettings from './pages/cms/CMSSettings';
 import CMSAIInsights from './pages/cms/CMSAIInsights';
 import CMSUserMigration from './pages/cms/CMSUserMigration';
 import CMSWalletHealth from './pages/cms/CMSWalletHealth';
+import CMSAppStatus from './pages/cms/CMSAppStatus';
 import CMSUnauthorized from './pages/cms/CMSUnauthorized';
 import Maintenance from './pages/Maintenance';
 import EggGachaPage from './pages/EggGachaPage';
@@ -233,6 +234,7 @@ function App() {
                                   <Route path="star-scanner" element={<CMSStarScanner />} />
                                   <Route path="financial" element={<CMSFinancial />} />
                                   <Route path="wallet-health" element={<CMSWalletHealth />} />
+                                  <Route path="app-status" element={<CMSAppStatus />} />
                                   <Route path="rewards" element={<CMSRewards />} />
                                   <Route path="workshops" element={<CMSWorkshops />} />
                                   <Route path="edu-workshops" element={<CMSEduWorkshops />} />

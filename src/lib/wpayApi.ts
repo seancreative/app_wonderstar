@@ -2,11 +2,13 @@
 // Connects to the Laravel backend for WPay transaction and user management
 
 const WPAY_API_BASE_URL = import.meta.env.VITE_WPAY_API_URL || 'https://app.aigenius.com.my';
+const WPAY_APP_SOURCE = (import.meta.env.VITE_WPAY_APP_SOURCE || 'wonderstar').trim().toLowerCase();
 
 interface WPayTransaction {
   id: string;
   wpay_user_id: string;
   email: string;
+  app_source?: string;
   order_id: string;
   payment_category: 'topup' | 'checkout';
   payment_type: 'online' | 'wbalance' | 'free';
@@ -30,6 +32,7 @@ interface WPayTransaction {
 interface WPayUser {
   id: string;
   email: string;
+  app_source?: string;
   lifetime_topups: number;
   wbalance: number;
   bonus: number;
@@ -80,6 +83,7 @@ export async function getAllTransactions(filters?: {
 }): Promise<{ transactions: WPayTransaction[]; count: number }> {
   try {
     const params = new URLSearchParams();
+    params.append('app_source', WPAY_APP_SOURCE);
     if (filters?.status) params.append('status', filters.status);
     if (filters?.payment_category) params.append('payment_category', filters.payment_category);
     if (filters?.from_date) params.append('from_date', filters.from_date);
@@ -118,7 +122,7 @@ export async function getAllTransactions(filters?: {
  */
 export async function getAllUsers(): Promise<{ users: WPayUser[]; count: number }> {
   try {
-    const response = await fetch(`${WPAY_API_BASE_URL}/wpay/admin/users`, {
+    const response = await fetch(`${WPAY_API_BASE_URL}/wpay/admin/users?app_source=${encodeURIComponent(WPAY_APP_SOURCE)}`, {
       headers: {
         'Accept': 'application/json'
       }
@@ -149,7 +153,7 @@ export async function getAllUsers(): Promise<{ users: WPayUser[]; count: number 
  */
 export async function getStats(): Promise<WPayStats> {
   try {
-    const response = await fetch(`${WPAY_API_BASE_URL}/wpay/admin/stats`, {
+    const response = await fetch(`${WPAY_API_BASE_URL}/wpay/admin/stats?app_source=${encodeURIComponent(WPAY_APP_SOURCE)}`, {
       headers: {
         'Accept': 'application/json'
       }
@@ -184,7 +188,7 @@ export async function updateTransaction(
   }
 ): Promise<WPayTransaction> {
   try {
-    const response = await fetch(`${WPAY_API_BASE_URL}/wpay/admin/transaction/${id}`, {
+    const response = await fetch(`${WPAY_API_BASE_URL}/wpay/admin/transaction/${id}?app_source=${encodeURIComponent(WPAY_APP_SOURCE)}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -215,7 +219,7 @@ export async function updateTransaction(
  */
 export async function deleteTransaction(id: string): Promise<void> {
   try {
-    const response = await fetch(`${WPAY_API_BASE_URL}/wpay/admin/transaction/${id}`, {
+    const response = await fetch(`${WPAY_API_BASE_URL}/wpay/admin/transaction/${id}?app_source=${encodeURIComponent(WPAY_APP_SOURCE)}`, {
       method: 'DELETE',
       headers: {
         'Accept': 'application/json'
@@ -245,7 +249,7 @@ export async function cleanupDuplicates(): Promise<{
   message: string;
 }> {
   try {
-    const response = await fetch(`${WPAY_API_BASE_URL}/wpay/admin/cleanup-duplicates`, {
+    const response = await fetch(`${WPAY_API_BASE_URL}/wpay/admin/cleanup-duplicates?app_source=${encodeURIComponent(WPAY_APP_SOURCE)}`, {
       method: 'POST',
       headers: {
         'Accept': 'application/json'
@@ -282,7 +286,7 @@ export async function syncFromSupabase(): Promise<{
   message: string;
 }> {
   try {
-    const response = await fetch(`${WPAY_API_BASE_URL}/wpay/admin/sync`, {
+    const response = await fetch(`${WPAY_API_BASE_URL}/wpay/admin/sync?app_source=${encodeURIComponent(WPAY_APP_SOURCE)}`, {
       method: 'POST',
       headers: {
         'Accept': 'application/json'
@@ -316,7 +320,7 @@ export async function syncFromSupabase(): Promise<{
  */
 export async function getTestTransactions(): Promise<{ transactions: WPayTransaction[]; count: number }> {
   try {
-    const response = await fetch(`${WPAY_API_BASE_URL}/wpay/admin/test-transactions`, {
+    const response = await fetch(`${WPAY_API_BASE_URL}/wpay/admin/test-transactions?app_source=${encodeURIComponent(WPAY_APP_SOURCE)}`, {
       headers: {
         'Accept': 'application/json'
       }

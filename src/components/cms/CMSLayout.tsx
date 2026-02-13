@@ -140,6 +140,7 @@ const CMSLayout: React.FC<CMSLayoutProps> = ({ children }) => {
     { label: 'Marketing', path: '/cms/marketing', icon: Megaphone, resource: 'marketing' },
     { label: 'Analytics', path: '/cms/analytics', icon: BarChart3, resource: 'analytics' },
     { label: 'Finance', path: '/cms/financial', icon: DollarSign, resource: 'finance' },
+    { label: 'App Status', path: '/cms/app-status', icon: Globe, resource: 'settings' },
     {
       label: 'Settings',
       path: '/cms/settings',

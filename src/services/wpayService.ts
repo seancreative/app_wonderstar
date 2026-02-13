@@ -9,6 +9,7 @@
 import { API_BASE_URL } from '../config/api';
 
 const WPAY_BASE_URL = API_BASE_URL;
+const WPAY_APP_SOURCE = (import.meta.env.VITE_WPAY_APP_SOURCE || 'wonderstar').trim().toLowerCase();
 
 // Simple headers that don't trigger preflight
 const SIMPLE_HEADERS = {
@@ -33,6 +34,7 @@ export type WPayStatus = 'success' | 'pending' | 'failed';
 
 export interface WPayProfile {
     email: string;
+    app_source?: string;
     lifetime_topups: number;
     wbalance: number;
     bonus: number;
@@ -43,6 +45,7 @@ export interface WPayProfile {
 
 export interface WPayProcessRequest {
     email: string;
+    app_source?: string;
     payment_category: PaymentCategory;
     payment_type: PaymentType;
     order_id: string;
@@ -80,6 +83,7 @@ export interface WPayTransaction {
     id: string;
     order_id: string;
     email: string;
+    app_source?: string;
     payment_category: PaymentCategory;
     payment_type: PaymentType;
     amount: number;
@@ -186,7 +190,16 @@ class WPayService {
      * Process a payment
      */
     async processPayment(data: WPayProcessRequest): Promise<WPayResponse> {
-        return this.request<WPayResponse>('/wpay/process', 'POST', data);
+        const metadata = {
+            ...(data.metadata || {}),
+            app_source: WPAY_APP_SOURCE,
+        };
+
+        return this.request<WPayResponse>('/wpay/process', 'POST', {
+            ...data,
+            app_source: WPAY_APP_SOURCE,
+            metadata,
+        });
     }
 
     /**
@@ -194,7 +207,8 @@ class WPayService {
      * Uses simple GET request to avoid preflight
      */
     async getProfile(email: string): Promise<{ wpay_status: WPayStatus; profile?: WPayProfile; message?: string }> {
-        return this.request(`/wpay/profile/${encodeURIComponent(email)}`);
+        const query = `app_source=${encodeURIComponent(WPAY_APP_SOURCE)}`;
+        return this.request(`/wpay/profile/${encodeURIComponent(email)}?${query}`);
     }
 
     /**
@@ -206,7 +220,8 @@ class WPayService {
         profile?: WPayProfile;
         message?: string;
     }> {
-        return this.request(`/wpay/transaction/${orderId}`);
+        const query = `app_source=${encodeURIComponent(WPAY_APP_SOURCE)}`;
+        return this.request(`/wpay/transaction/${orderId}?${query}`);
     }
 
     /**
@@ -218,7 +233,11 @@ class WPayService {
         profile?: WPayProfile;
         message?: string;
     }> {
-        return this.request('/wpay/topup-preview', 'POST', { email, amount });
+        return this.request('/wpay/topup-preview', 'POST', {
+            email,
+            amount,
+            app_source: WPAY_APP_SOURCE,
+        });
     }
 
     /**
@@ -237,7 +256,8 @@ class WPayService {
         profile?: WPayProfile;
         message?: string;
     }> {
-        return this.request(`/wpay/complete/${orderId}`, 'POST');
+        const query = `app_source=${encodeURIComponent(WPAY_APP_SOURCE)}`;
+        return this.request(`/wpay/complete/${orderId}?${query}`, 'POST');
     }
 
     /**

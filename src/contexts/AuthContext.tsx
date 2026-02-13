@@ -3,6 +3,8 @@ import { supabase } from '../lib/supabase';
 import type { User } from '../types/database';
 import type { Session } from '@supabase/supabase-js';
 
+const WPAY_APP_SOURCE = (import.meta.env.VITE_WPAY_APP_SOURCE || 'wonderstar').trim().toLowerCase();
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
@@ -177,6 +179,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             supabase_user_id: userData.id,
             name: name,
             phone: phone,
+            app_source: WPAY_APP_SOURCE,
           }),
         });
 

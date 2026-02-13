@@ -358,6 +358,13 @@ const CMSSettings: React.FC = () => {
             <Store className="w-4 h-4" />
             Outlets
           </button>
+          <button
+            onClick={() => navigate('/cms/app-status')}
+            className="flex items-center gap-2 px-4 py-2 bg-white border-2 border-amber-200 text-amber-700 rounded-lg font-semibold hover:bg-amber-50 transition-colors"
+          >
+            <AlertTriangle className="w-4 h-4" />
+            App Status
+          </button>
         </div>
 
         <div className="bg-white rounded-2xl border border-gray-200 overflow-visible">

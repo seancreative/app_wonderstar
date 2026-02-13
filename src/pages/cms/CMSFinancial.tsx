@@ -5,6 +5,8 @@ import { supabase } from '../../lib/supabase';
 import { formatDateTimeCMS, formatDateTimeExcel } from '../../utils/dateFormatter';
 import { getAllUsers, type WPayUser } from '../../lib/wpayApi';
 
+const WPAY_APP_SOURCE = (import.meta.env.VITE_WPAY_APP_SOURCE || 'wonderstar').trim().toLowerCase();
+
 interface FinancialStats {
   totalRevenue: number;
   monthlyRevenue: number;
@@ -127,7 +129,12 @@ const CMSFinancial: React.FC = () => {
   const loadWPayTopups = async () => {
     try {
       setTopupsLoading(true);
-      const response = await fetch('https://app.aigenius.com.my/wpay/admin/transactions?payment_category=topup&status=success');
+      const params = new URLSearchParams({
+        payment_category: 'topup',
+        status: 'success',
+        app_source: WPAY_APP_SOURCE,
+      });
+      const response = await fetch(`https://app.aigenius.com.my/wpay/admin/transactions?${params.toString()}`);
       const data = await response.json();
 
       let filtered = data.transactions || [];

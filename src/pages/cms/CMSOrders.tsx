@@ -56,6 +56,8 @@ import {
 } from '../../utils/orderStatusUtils';
 import { useToast } from '../../contexts/ToastContext';
 
+const WPAY_APP_SOURCE = (import.meta.env.VITE_WPAY_APP_SOURCE || 'wonderstar').trim().toLowerCase();
+
 interface OrderWithDetails extends ShopOrder {
   users?: UserType;
   outlets?: Outlet;
@@ -146,7 +148,12 @@ const CMSOrders: React.FC = () => {
   // Load WPay topup transactions from Laravel API
   const loadWPayTopups = async () => {
     try {
-      const response = await fetch('https://app.aigenius.com.my/wpay/admin/transactions?payment_category=topup&status=success');
+      const params = new URLSearchParams({
+        payment_category: 'topup',
+        status: 'success',
+        app_source: WPAY_APP_SOURCE,
+      });
+      const response = await fetch(`https://app.aigenius.com.my/wpay/admin/transactions?${params.toString()}`);
       if (response.ok) {
         const data = await response.json();
         if (data.wpay_status === 'success' && data.transactions) {
