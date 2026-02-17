@@ -5,6 +5,9 @@ import { ArrowLeft, User, Mail, Phone, Lock, Sparkles, MapPin, Globe, Shield, Ch
 import ProductShowcase from '../components/ProductShowcase';
 import { API_BASE_URL } from '../config/api';
 
+// Toggle this to enable/disable SMS verification during registration
+const REQUIRE_SMS_VERIFICATION = false;
+
 const Signup: React.FC = () => {
 
   const navigate = useNavigate();
@@ -23,7 +26,7 @@ const Signup: React.FC = () => {
     receiveNews: false,
   });
 
-  const [step, setStep] = useState<'phone' | 'details'>('phone');
+  const [step, setStep] = useState<'phone' | 'details'>(REQUIRE_SMS_VERIFICATION ? 'phone' : 'details');
 
   const [verificationState, setVerificationState] = useState({
     otpSent: false,
@@ -185,7 +188,7 @@ const Signup: React.FC = () => {
       return;
     }
 
-    if (!verificationState.verified) {
+    if (REQUIRE_SMS_VERIFICATION && !verificationState.verified) {
       setError('Please verify your phone number before registering');
       setLoading(false);
       return;
@@ -363,20 +366,46 @@ const Signup: React.FC = () => {
             </div>
           ) : (
             <div className="glass-magical rounded-3xl p-6 space-y-4 backdrop-blur-xl bg-white/15 border border-white/25 shadow-2xl hover:bg-white/20 transition-all duration-300">
-              <div className="space-y-2 pb-4">
-                <button
-                  type="button"
-                  onClick={() => setStep('phone')}
-                  className="flex items-center gap-2 text-white/80 hover:text-white transition-colors"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  Back to phone
-                </button>
-                <div className="flex items-center justify-center gap-2">
-                  <Check className="w-6 h-6 text-green-400" />
-                  <span className="text-white/80">Phone Verified: +60{formData.phone}</span>
+              {REQUIRE_SMS_VERIFICATION ? (
+                <div className="space-y-2 pb-4">
+                  <button
+                    type="button"
+                    onClick={() => setStep('phone')}
+                    className="flex items-center gap-2 text-white/80 hover:text-white transition-colors"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                    Back to phone
+                  </button>
+                  <div className="flex items-center justify-center gap-2">
+                    <Check className="w-6 h-6 text-green-400" />
+                    <span className="text-white/80">Phone Verified: +60{formData.phone}</span>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div>
+                  <label className="block text-sm font-medium text-white/90 mb-2">
+                    Phone Number
+                  </label>
+                  <div className="flex gap-2">
+                    <div className="w-20 px-3 py-3.5 bg-white/30 backdrop-blur-sm border border-white/40 rounded-xl text-white flex items-center justify-center font-bold">
+                      +60
+                    </div>
+                    <div className="relative flex-1">
+                      <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/70" />
+                      <input
+                        type="tel"
+                        value={formData.phone}
+                        onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, '').slice(0, 11) })}
+                        className="w-full pl-12 pr-4 py-3.5 bg-white/20 backdrop-blur-sm border border-white/30 rounded-xl text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-pink-400/50 focus:bg-white/25 focus:border-pink-400/50 transition-all"
+                        placeholder="123456789"
+                        required
+                        minLength={9}
+                        maxLength={11}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-white/90 mb-2">
