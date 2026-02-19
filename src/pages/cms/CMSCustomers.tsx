@@ -33,6 +33,8 @@ interface CustomerWithDetails extends User {
   prize_redemptions?: any[];
 }
 
+const PAGE_SIZE = 50;
+
 const CMSCustomers: React.FC = () => {
   const [customers, setCustomers] = useState<CustomerWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,13 +43,66 @@ const CMSCustomers: React.FC = () => {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showChildrenStats, setShowChildrenStats] = useState(false);
   const [bonusBalances, setBonusBalances] = useState<Record<string, number>>({});
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [totalTopups, setTotalTopups] = useState(0);
+  const [totalChildren, setTotalChildren] = useState(0);
+  const [allStates, setAllStates] = useState<Record<string, number>>({});
 
   useEffect(() => {
-    loadCustomers();
+    loadTotalStats();
   }, []);
 
-  const loadCustomers = async () => {
+  useEffect(() => {
+    loadCustomers(currentPage);
+  }, [currentPage]);
+
+  // Load aggregate stats separately (not limited by pagination)
+  const loadTotalStats = async () => {
     try {
+      // Get total count
+      const { count } = await supabase
+        .from('users')
+        .select('*', { count: 'exact', head: true });
+      setTotalCount(count || 0);
+
+      // Get total topups
+      const { data: topupData } = await supabase
+        .from('users')
+        .select('lifetime_topups');
+      if (topupData) {
+        setTotalTopups(topupData.reduce((sum, u) => sum + (u.lifetime_topups || 0), 0));
+      }
+
+      // Get total children count
+      const { count: childCount } = await supabase
+        .from('child_profiles')
+        .select('*', { count: 'exact', head: true });
+      setTotalChildren(childCount || 0);
+
+      // Get state distribution from ALL users
+      const { data: stateData } = await supabase
+        .from('users')
+        .select('state');
+      if (stateData) {
+        const dist: Record<string, number> = {};
+        stateData.forEach(u => {
+          const state = u.state || 'Unknown';
+          dist[state] = (dist[state] || 0) + 1;
+        });
+        setAllStates(dist);
+      }
+    } catch (err) {
+      console.error('Error loading total stats:', err);
+    }
+  };
+
+  const loadCustomers = async (page: number) => {
+    try {
+      setLoading(true);
+      const from = (page - 1) * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+
       const { data, error } = await supabase
         .from('users')
         .select(`
@@ -58,7 +113,7 @@ const CMSCustomers: React.FC = () => {
           stamps_redemptions(*)
         `)
         .order('created_at', { ascending: false })
-        .limit(500);
+        .range(from, to);
 
       if (error) throw error;
 
@@ -93,7 +148,7 @@ const CMSCustomers: React.FC = () => {
 
       setCustomers(customersWithRedemptions);
 
-      // Calculate master bonus balances for all customers
+      // Calculate master bonus balances for current page
       const bonusBalancesMap: Record<string, number> = {};
       await Promise.all(
         customersWithRedemptions.map(async (customer) => {
@@ -106,7 +161,7 @@ const CMSCustomers: React.FC = () => {
           }
         })
       );
-      setBonusBalances(bonusBalancesMap);
+      setBonusBalances(prev => ({ ...prev, ...bonusBalancesMap }));
     } catch (err) {
       console.error('Error loading customers:', err);
     } finally {
@@ -158,24 +213,17 @@ const CMSCustomers: React.FC = () => {
     a.click();
   };
 
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+
   const stats = {
-    total: filteredCustomers.length,
-    totalTopups: filteredCustomers.reduce((sum, c) => sum + c.lifetime_topups, 0),
-    avgTopup: filteredCustomers.length > 0
-      ? filteredCustomers.reduce((sum, c) => sum + c.lifetime_topups, 0) / filteredCustomers.length
-      : 0,
-    totalChildren: filteredCustomers.reduce((sum, c) => sum + (c.child_profiles?.length || 0), 0)
+    total: totalCount,
+    totalTopups: totalTopups,
+    avgTopup: totalCount > 0 ? totalTopups / totalCount : 0,
+    totalChildren: totalChildren
   };
 
-  // Calculate customer distribution by state
-  const stateDistribution = filteredCustomers.reduce((acc, customer) => {
-    const state = customer.state || 'Unknown';
-    acc[state] = (acc[state] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-
-  // Sort by count descending
-  const sortedStates = Object.entries(stateDistribution)
+  // Sort by count descending — use allStates from the full dataset
+  const sortedStates = Object.entries(allStates)
     .sort((a, b) => b[1] - a[1]);
 
   // State colors for visual distinction
@@ -197,7 +245,7 @@ const CMSCustomers: React.FC = () => {
     'Unknown': 'from-gray-400 to-gray-500'
   };
 
-  if (loading) {
+  if (loading && customers.length === 0) {
     return (
       <CMSLayout>
         <div className="flex items-center justify-center h-64">
@@ -289,7 +337,7 @@ const CMSCustomers: React.FC = () => {
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                 {sortedStates.map(([state, count]) => {
-                  const percentage = ((count / stats.total) * 100).toFixed(1);
+                  const percentage = totalCount > 0 ? ((count / totalCount) * 100).toFixed(1) : '0';
                   const colorClass = stateColors[state] || 'from-gray-400 to-gray-500';
                   return (
                     <div
@@ -491,6 +539,59 @@ const CMSCustomers: React.FC = () => {
             </table>
           </div>
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between bg-white rounded-2xl border border-gray-200 p-4">
+            <p className="text-sm text-gray-600 font-medium">
+              Showing {((currentPage - 1) * PAGE_SIZE) + 1}–{Math.min(currentPage * PAGE_SIZE, totalCount)} of {totalCount} customers
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-4 py-2 rounded-lg border border-gray-300 text-sm font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                Previous
+              </button>
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let page: number;
+                if (totalPages <= 5) {
+                  page = i + 1;
+                } else if (currentPage <= 3) {
+                  page = i + 1;
+                } else if (currentPage >= totalPages - 2) {
+                  page = totalPages - 4 + i;
+                } else {
+                  page = currentPage - 2 + i;
+                }
+                return (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`w-10 h-10 rounded-lg text-sm font-bold transition-colors ${
+                      currentPage === page
+                        ? 'bg-blue-600 text-white'
+                        : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    {page}
+                  </button>
+                );
+              })}
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="px-4 py-2 rounded-lg border border-gray-300 text-sm font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                Next
+              </button>
+            </div>
+            {loading && (
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+            )}
+          </div>
+        )}
       </div>
 
       {showDetailModal && selectedCustomer && (
