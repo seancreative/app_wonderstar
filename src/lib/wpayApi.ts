@@ -346,4 +346,40 @@ export async function getTestTransactions(): Promise<{ transactions: WPayTransac
   }
 }
 
+export async function syncPaymentStatusToSupabase(): Promise<{
+  updated: number;
+  already_correct: number;
+  not_found_in_supabase: number;
+  total_wpay_success_transactions: number;
+  errors: string[];
+  details: Array<{
+    order_number: string;
+    old_payment_status: string;
+    old_status: string;
+    new_payment_status: string;
+    new_status: string;
+  }>;
+}> {
+  try {
+    const response = await fetch(
+      `${WPAY_API_BASE_URL}/wpay/admin/sync-payment-status?app_source=${WPAY_APP_SOURCE}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
+
+    const data = await response.json();
+
+    if (data.wpay_status === 'success') {
+      return data;
+    }
+
+    throw new Error(data.message || 'Sync failed');
+  } catch (error) {
+    console.error('Error syncing payment status:', error);
+    throw error;
+  }
+}
+
 export type { WPayTransaction, WPayUser, WPayStats };

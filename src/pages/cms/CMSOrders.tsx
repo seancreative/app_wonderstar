@@ -26,7 +26,8 @@ import {
   Receipt,
   Trash2,
   AlertTriangle,
-  RotateCcw
+  RotateCcw,
+  RefreshCw
 } from 'lucide-react';
 import QRCodeDisplay from '../../components/QRCodeDisplay';
 import ReceiptModal from '../../components/ReceiptModal';
@@ -55,6 +56,7 @@ import {
   type FulfillmentStatus
 } from '../../utils/orderStatusUtils';
 import { useToast } from '../../contexts/ToastContext';
+import { syncPaymentStatusToSupabase } from '../../lib/wpayApi';
 
 const WPAY_APP_SOURCE = (import.meta.env.VITE_WPAY_APP_SOURCE || 'wonderstar').trim().toLowerCase();
 
@@ -103,6 +105,7 @@ const CMSOrders: React.FC = () => {
   // Bulk selection
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
   const [viewDeleted, setViewDeleted] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   // Custom Delete Modal State
   const [deleteConfirmModal, setDeleteConfirmModal] = useState<{
@@ -641,6 +644,23 @@ const CMSOrders: React.FC = () => {
     setDeleteConfirmModal({ ...deleteConfirmModal, isOpen: false });
   };
 
+  // Sync payment statuses from WPay to Supabase
+  const handleSyncPaymentStatus = async () => {
+    setSyncing(true);
+    try {
+      const result = await syncPaymentStatusToSupabase();
+      toast.success(
+        `Sync complete: ${result.updated} orders updated, ${result.already_correct} already correct, ${result.not_found_in_supabase} not found in Supabase`
+      );
+      // Reload orders to reflect the updated statuses
+      loadOrders();
+    } catch (error: any) {
+      toast.error('Sync failed: ' + (error.message || 'Unknown error'));
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const exportToCSV = () => {
     const headers = [
       'Order #',
@@ -901,6 +921,15 @@ const CMSOrders: React.FC = () => {
                   View Trash
                 </>
               )}
+            </button>
+            <button
+              onClick={handleSyncPaymentStatus}
+              disabled={syncing}
+              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl font-bold hover:scale-105 transition-transform shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+              title="Sync payment statuses from WPay to Supabase (fixes mismatched order statuses)"
+            >
+              <RefreshCw className={`w-5 h-5 ${syncing ? 'animate-spin' : ''}`} />
+              {syncing ? 'Syncing...' : 'Sync Status'}
             </button>
             <button
               onClick={() => navigate('/cms/ai-insights')}

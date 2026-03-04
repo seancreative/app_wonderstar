@@ -3,7 +3,8 @@ import CMSLayout from '../../components/cms/CMSLayout';
 import { DollarSign, TrendingUp, Calendar, Download, CreditCard, Wallet, ShoppingBag, RefreshCw, FileSpreadsheet, Gift, ChevronLeft, ChevronRight, PiggyBank, Users, MapPin } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { formatDateTimeCMS, formatDateTimeExcel } from '../../utils/dateFormatter';
-import { getAllUsers, type WPayUser } from '../../lib/wpayApi';
+import { getAllUsers, syncPaymentStatusToSupabase, type WPayUser } from '../../lib/wpayApi';
+import { useToast } from '../../contexts/ToastContext';
 
 const WPAY_APP_SOURCE = (import.meta.env.VITE_WPAY_APP_SOURCE || 'wonderstar').trim().toLowerCase();
 
@@ -24,7 +25,9 @@ interface FinancialStats {
 }
 
 const CMSFinancial: React.FC = () => {
+  const toast = useToast();
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const [stats, setStats] = useState<FinancialStats>({
     totalRevenue: 0,
     monthlyRevenue: 0,
@@ -85,6 +88,22 @@ const CMSFinancial: React.FC = () => {
   useEffect(() => {
     setCurrentPage(1);
   }, [statusFilter, methodFilter, paymentTypeFilter]);
+
+  const handleSyncPaymentStatus = async () => {
+    setSyncing(true);
+    try {
+      const result = await syncPaymentStatusToSupabase();
+      toast.success(
+        `Sync complete: ${result.updated} orders updated, ${result.already_correct} already correct, ${result.not_found_in_supabase} not found in Supabase`
+      );
+      loadFinancialStats();
+      loadTransactions();
+    } catch (error: any) {
+      toast.error('Sync failed: ' + (error.message || 'Unknown error'));
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const applyQuickFilter = (filter: 'all' | 'today' | 'week' | 'month') => {
     setQuickFilter(filter);
@@ -530,6 +549,15 @@ const CMSFinancial: React.FC = () => {
             >
               <RefreshCw className={`w-5 h-5 ${loading || topupsLoading ? 'animate-spin' : ''}`} />
               Refresh
+            </button>
+            <button
+              onClick={handleSyncPaymentStatus}
+              disabled={syncing}
+              className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl font-bold hover:scale-105 transition-transform shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+              title="Sync payment statuses from WPay to Supabase (fixes mismatched order statuses)"
+            >
+              <RefreshCw className={`w-5 h-5 ${syncing ? 'animate-spin' : ''}`} />
+              {syncing ? 'Syncing...' : 'Sync Status'}
             </button>
             <button
               onClick={exportDetailedReport}
